@@ -129,13 +129,11 @@ bool rt_init(void) {
 	}
 
 	/* Open the virtual network device */
+
+	clear(new(rt_vnd));
 	
-	if(!cfg_get_string(tinc_cfg, "Device", "/dev/net/tun", &rt_vnd->device)
-			|| !cfg_get_string(tinc_cfg, "Interface", tinc_netname, &rt_vnd->interface)
-			|| !cfg_get_choice(tinc_cfg, "Mode", mode_choice, RT_MODE_ROUTER, rt_mode)) {
-		vnd_free(rt_vnd);
-		return false;
-	}
+	replace(rt_vnd->device, device);
+	replace(rt_vnd->interface, iface);
 	
 	rt_vnd->mode = (rt_mode == RT_MODE_ROUTER) ? VND_MODE_TUN : VND_MODE_TAP;
 	rt_vnd->recv = rt_vnd_recv;
@@ -167,6 +165,8 @@ bool rt_init(void) {
 		clear(new(listener));
 		listener->local.address = *(struct sockaddr_storage *)aip->ai_addr;
 		listener->local.id = myself->name;
+		listener->type = SOCK_STREAM;
+		listener->protocol = IPPROTO_TCP;
 		// listener->local.cred = ...;
 		listener->accept = rt_tnl_accept;
 

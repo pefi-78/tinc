@@ -47,6 +47,8 @@ bool node_validname(const char *name) {
 }
 
 bool node_init(void) {
+	char *cfgfilename;
+
 	nodes = avl_tree_new((avl_compare_t)node_compare, (avl_action_t)node_free);
 	myself = node_new();
 
@@ -61,6 +63,18 @@ bool node_init(void) {
 		node_exit();
 		return false;
 	}
+
+	myself->cfg = cfg_tree_new();
+
+	asprintf(&cfgfilename, "%s/hosts/%s", tinc_confbase, myself->name);
+
+	if(!cfg_read_file(myself->cfg, cfgfilename)) {
+		free(cfgfilename);
+		node_exit();
+		return false;
+	}
+
+	free(cfgfilename);
 	
 	return true;
 }

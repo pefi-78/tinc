@@ -79,10 +79,14 @@ bool fd_del(struct fd *fd) {
 	FD_CLR(fd->fd, &writeset);
 	FD_CLR(fd->fd, &errorset);
 	
-	if(fd->fd >= max_fd)
-		max_fd = ((struct fd *)fds->tail)->fd;
+	avl_del(fds, fd);
 
-	return avl_del(fds, fd);
+	if(fds->tail)
+		max_fd = ((struct fd *)fds->tail->data)->fd;
+	else
+		max_fd = 0;
+
+	return true;
 };
 
 bool fd_mod(struct fd *fd) {

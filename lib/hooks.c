@@ -17,22 +17,37 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-    $Id: hooks.c,v 1.1.2.2 2002/04/16 17:20:46 zarq Exp $
+    $Id: hooks.c,v 1.1.2.3 2002/04/16 21:24:55 zarq Exp $
 */
 
 #include "config.h"
 
 #include <assert.h>
 #include <stdarg.h>
+#include <stdio.h>
 
 #include <avl_tree.h>
 #include <hooks.h>
+#include <xalloc.h>
 
 avl_tree_t *hooks_tree = NULL;
 
+struct hooks_node {
+  const char* type;
+  avl_tree_t *hooks;
+} hooks_node;
+
 static int hook_type_compare(const void *a, const void *b)
 {
-  return strcmp((const char*)a, (const char*)b);
+  /* This is not exactly how AVL was meant to be used, but since we
+     only use a limited number of functions, I do this anyway.  Assume
+     the left parameter (a) is the value we give as target, the right
+     (b) will be the value in the data pointer of an avl_node_t
+     struct, which is a struct hooks_node in our case. */
+  /* So you should FIXME. */
+  return strcmp((const char*)a,
+		/* ((const struct hooks_node*)a)->type, */
+		((const struct hooks_node*)b)->type);
 }
 
 static int hook_dummy_compare(const void *a, const void *b)
@@ -48,16 +63,19 @@ void run_hooks(const char *type, ...)
 {
   avl_node_t *avlnode;
   va_list args;
-  avl_tree_t *t;
+  struct hooks_node *hn;
 
   if(!hooks_tree)
     return;
-  t = avl_search(hooks_tree, type);
-  if(!t)
-    return;
+  hn = (struct hooks_node*)avl_search(hooks_tree, type);
+  if(!hn)
+    {
+      fprintf(stderr, "Warning, no hooks found for `%s'\n", type);
+      return;
+    }
 
   va_start(args, type);
-  for(avlnode = t->head; avlnode; avlnode = avlnode->next)
+  for(avlnode = hn->hooks->head; avlnode; avlnode = avlnode->next)
     {
       assert(avlnode->data);
       ((hook_function_t*)(avlnode->data))(type, args);
@@ -67,19 +85,24 @@ void run_hooks(const char *type, ...)
 
 void add_hook(const char *type, hook_function_t *hook)
 {
-  avl_tree_t *t;
+  struct hooks_node *hn;
   
   if(!hooks_tree)
     hooks_tree = avl_alloc_tree(hook_type_compare, NULL);
 
-  t = avl_search(hooks_tree, type);
-  if(!t)
+  hn = avl_search(hooks_tree, type);
+  if(!hn)
     {
+      avl_tree_t *t;
+      
+      hn = xmalloc(sizeof(struct hooks_node));
       t = avl_alloc_tree(hook_dummy_compare, NULL);
-      avl_insert(log_hooks_tree, (void*)t);
+      hn->type = type;
+      hn->hooks = t;
+      avl_insert(hooks_tree, (void*)hn);
     }
-  
-  avl_insert(t, (void*)hook);
+
+  avl_insert(hn->hooks, (void*)hook);
 }
 
 void del_hook(const char *type, hook_function_t *hook)

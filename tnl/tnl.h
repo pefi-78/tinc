@@ -24,6 +24,7 @@
 #define __TNL_H__
 
 #include <gnutls/gnutls.h>
+#include <gnutls/extra.h>
 
 #include "fd/fd.h"
 
@@ -47,12 +48,26 @@ typedef enum tnl_status {
 	TNL_STATUS_UP,
 } tnl_status_t;
 
+typedef struct tnl_ep_credentials {
+	gnutls_credentials_type type;
+	union {
+		gnutls_anon_client_credentials anon_client;
+		gnutls_anon_server_credentials anon_server;
+		gnutls_srp_client_credentials srp_client;
+		gnutls_srp_server_credentials srp_server;
+		gnutls_certificate_credentials certificate;
+	};
+} tnl_ep_credentials_t;		
+
+typedef struct tnl_ep_cryptoparm {
+} tnl_ep_cryptoparm_t;
+
 typedef struct tnl_ep {
 	struct sockaddr_storage address;
 	char *id;
 	char *hostname;
-	struct tnl_ep_credentials *cred;
-	struct tnl_ep_cryptoparm *parm;
+	struct tnl_ep_credentials cred;
+	struct tnl_ep_cryptoparm parm;
 } tnl_ep_t;
 
 typedef struct tnl {
@@ -75,8 +90,8 @@ typedef struct tnl {
 
 	/* private */
 	
-	struct fd fd;
 	gnutls_session session;
+	struct fd fd;
 	char buf[4096];
 	int bufread;
 } tnl_t;
@@ -95,11 +110,7 @@ typedef struct tnl_listen {
 extern bool tnl_listen(struct tnl_listen *listener);
 extern bool tnl_connect(struct tnl *tnl);
 
-extern bool tnl_credentials_sprint(const char *buf, int len, const struct tnl_ep_credentials *cred);
-extern bool tnl_credentials_sscan(const char *buf, struct tnl_ep_credentials *cred);
-extern bool tnl_cryptoparm_sprint(const char *buf, int len, const struct tnl_ep_cryptoparm *parm);
-extern bool tnl_cryptoparm_sscan(const char *buf, struct tnl_ep_cryptoparm *parm);
-extern bool tnl_credentials_fprint(FILE *stream, const struct tnl_ep_credentials *cred);
-extern bool tnl_credentials_fscan(FILE *stream, struct tnl_ep_credentials *cred);
+extern bool tnl_ep_set_x509_credentials(tnl_ep_t *tnl_ep, const char *key, const char *certificate, const char *trust, const char *crl);
+extern bool tnl_ep_set_openpgp_credentials(tnl_ep_t *tnl_ep, const char *privkey, const char *pubkey, const char *keyring, const char *trustdb);
 
 #endif /* __TNL_H__ */

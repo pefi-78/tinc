@@ -23,7 +23,9 @@
 #include "system.h"
 
 #include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
 
+#include "logger/logger.h"
 #include "support/avl.h"
 #include "support/sockaddr.h"
 #include "support/xalloc.h"
@@ -43,7 +45,8 @@ static bool tnl_send(tnl_t *tnl, const void *buf, int len) {
 			else
 				logger(LOG_INFO, _("tnl: connection closed by peer"));
 
-			tnl->error(tnl, result);
+			if(tnl->error)
+				tnl->error(tnl, result);
 			tnl->close(tnl);
 			return !result;
 		}
@@ -56,10 +59,10 @@ static bool tnl_send(tnl_t *tnl, const void *buf, int len) {
 }
 
 static bool tnl_recv(tnl_t *tnl) {
-	int result;
 	tnl_record_t *record = (tnl_record_t *)tnl->buf;
 
-	result = gnutls_record_recv(tnl->session, tnl->buf + tnl->bufread, sizeof tnl->buf - tnl->bufread);
+#if 0
+	int result = gnutls_record_recv(tnl->session, tnl->buf + tnl->bufread, sizeof tnl->buf - tnl->bufread);
 	if(result <= 0) {
 		if(result == GNUTLS_E_INTERRUPTED || result == GNUTLS_E_AGAIN)
 			return true;
@@ -69,26 +72,31 @@ static bool tnl_recv(tnl_t *tnl) {
 		else
 			logger(LOG_INFO, _("tnl: connection closed by peer"));
 
-		tnl->error(tnl, result);
+		if(tnl->error)
+			tnl->error(tnl, result);
 		tnl->close(tnl);
 		return !result;
 	}
 
 	tnl->bufread += result;
+#endif
 
 	while(tnl->bufread >= sizeof *record && tnl->bufread - sizeof *record >= record->len) {
 		switch(record->type) {
 			case TNL_RECORD_META:
-				tnl->recv_meta(tnl, record->data, record->len);
+				if(tnl->recv_meta)
+					tnl->recv_meta(tnl, record->data, record->len);
 				break;
 
 			case TNL_RECORD_PACKET:
-				tnl->recv_packet(tnl, record->data, record->len);
+				if(tnl->recv_packet)
+					tnl->recv_packet(tnl, record->data, record->len);
 				break;
 				
 			default:
 				logger(LOG_ERR, _("tnl: error while receiving: %s"), _("unknown record type"));
-				tnl->error(tnl, EINVAL);
+				if(tnl->error)
+					tnl->error(tnl, EINVAL);
 				tnl->close(tnl);
 				return false;
 		}
@@ -96,17 +104,31 @@ static bool tnl_recv(tnl_t *tnl) {
 		tnl->bufread -= sizeof *record + record->len;
 		memmove(tnl->buf, record->data + record->len, tnl->bufread);
 	}
+
+	return true;
 }
 
 static bool tnl_recv_handler(fd_t *fd) {
+	if(!fd)
+		abort();
+
 	tnl_t *tnl = fd->data;
 	int result;
 
 	result = gnutls_record_recv(tnl->session, tnl->buf + tnl->bufread, sizeof(tnl->buf) - tnl->bufread);
-	if(result < 0) {
+	if(result <= 0) {
+		if(!result) {
+			logger(LOG_DEBUG, _("tnl: connection closed by peer %s (%s)"), tnl->remote.id, tnl->remote.hostname);
+			if(tnl->error)
+				tnl->error(tnl, 0);
+			tnl->close(tnl);
+			return false;
+		}	
+					
 		if(gnutls_error_is_fatal(result)) {
-			logger(LOG_DEBUG, _("tnl: reception failed: %s\n"), gnutls_strerror(result));
-			tnl->error(tnl, result);
+			logger(LOG_DEBUG, _("tnl: reception failed: %s"), gnutls_strerror(result));
+			if(tnl->error)
+				tnl->error(tnl, result);
 			tnl->close(tnl);
 			return false;
 		}
@@ -118,11 +140,81 @@ static bool tnl_recv_handler(fd_t *fd) {
 	return tnl_recv(tnl);
 }
 
-static bool tnl_authenticate(tnl_t *tnl) {
+bool tnl_ep_set_x509_credentials(tnl_ep_t *tnl_ep, const char *privkey, const char *certificate, const char *trust, const char *crl) {
+	int err;
+
+	if(tnl_ep->cred.certificate) {
+		gnutls_certificate_free_credentials(tnl_ep->cred.certificate);
+		tnl_ep->cred.certificate = NULL;
+	}
+	
+	if((err = gnutls_certificate_allocate_credentials(&tnl_ep->cred.certificate)) < 0) {
+		logger(LOG_ERR, _("Failed to allocate certificate credentials: %s"), gnutls_strerror(err));
+		return false;
+	}
+
+	if((err = gnutls_certificate_set_x509_key_file(tnl_ep->cred.certificate, certificate, privkey, GNUTLS_X509_FMT_PEM)) < 0) {
+		logger(LOG_ERR, _("Failed to load X.509 key and/or certificate: %s"), gnutls_strerror(err));
+		return false;
+	}
+
+	tnl_ep->cred.type = GNUTLS_CRD_CERTIFICATE;
+
+	if(trust && (err = gnutls_certificate_set_x509_trust_file(tnl_ep->cred.certificate, trust, GNUTLS_X509_FMT_PEM)) < 0) {
+		logger(LOG_ERR, _("Failed to set X.509 trust file: %s"), gnutls_strerror(err));
+		return false;
+	}
+	
+	if(crl && (err = gnutls_certificate_set_x509_crl_file(tnl_ep->cred.certificate, crl, GNUTLS_X509_FMT_PEM)) < 0) {
+		logger(LOG_ERR, _("Failed to set X.509 CRL file: %s"), gnutls_strerror(err));
+		return false;
+	}
+
+	//gnutls_certificate_set_verify_flags(tnl_ep->cred.certificate, GNUTLS_VERIFY_DISABLE_CA_SIGN);
+
+	return true;
+}	
+
+bool tnl_ep_set_openpgp_credentials(tnl_ep_t *tnl_ep, const char *privkey, const char *pubkey, const char *keyring, const char *trustdb) {
+	int err;
+
+	if(tnl_ep->cred.certificate) {
+		gnutls_certificate_free_credentials(tnl_ep->cred.certificate);
+		tnl_ep->cred.certificate = NULL;
+	}
+	
+	if((err = gnutls_certificate_allocate_credentials(&tnl_ep->cred.certificate)) < 0) {
+		logger(LOG_ERR, _("Failed to allocate certificate credentials: %s"), gnutls_strerror(err));
+		return false;
+	}
+
+	if((err = gnutls_certificate_set_openpgp_key_file(tnl_ep->cred.certificate, pubkey, privkey)) < 0) {
+		logger(LOG_ERR, _("Failed to load public and/or private OpenPGP key: %s"), gnutls_strerror(err));
+		return false;
+	}
+
+	tnl_ep->cred.type = GNUTLS_CRD_CERTIFICATE;
+
+	if(keyring && (err = gnutls_certificate_set_openpgp_keyring_file(tnl_ep->cred.certificate, keyring)) < 0) {
+		logger(LOG_ERR, _("Failed to set OpenPGP keyring file: %s"), gnutls_strerror(err));
+		return false;
+	}
+	
+	if(trustdb && (err = gnutls_certificate_set_openpgp_trustdb(tnl_ep->cred.certificate, trustdb)) < 0) {
+		logger(LOG_ERR, _("Failed to set OpenPGP trustdb file: %s"), gnutls_strerror(err));
+		return false;
+	}
+
+	//gnutls_certificate_set_verify_flags(tnl_ep->cred.certificate, GNUTLS_VERIFY_DISABLE_CA_SIGN);
+
+	return true;
+}		
+
+static bool tnl_authenticate_x509(tnl_t *tnl) {
 	gnutls_x509_crt cert;
         const gnutls_datum *certs;
         int ncerts = 0, result;
-	char buf[1024], *name, *p;
+	char name[1024];
 	int len;
 
 	certs = gnutls_certificate_get_peers(tnl->session, &ncerts);
@@ -132,38 +224,40 @@ static bool tnl_authenticate(tnl_t *tnl) {
 		return false;
 	}
 
-	len = sizeof buf;
 	gnutls_x509_crt_init(&cert);
-	result = gnutls_x509_crt_import(cert, certs, GNUTLS_X509_FMT_DER) ?: gnutls_x509_crt_get_dn(cert, buf, &len);
+	result = gnutls_x509_crt_import(cert, certs, GNUTLS_X509_FMT_DER);
 
 	if(result) {
-		logger(LOG_ERR, _("tnl: error importing certificate from %s: %s"), tnl->remote.hostname, gnutls_strerror(errno));
+		logger(LOG_ERR, _("tnl: error importing certificate from %s: %s"), tnl->remote.hostname, gnutls_strerror(result));
 		gnutls_x509_crt_deinit(cert);
 		return false;
 	}
 
-	name = strstr(buf, "CN=");
-	if(!name) {
-		logger(LOG_ERR, _("tnl: no name in certificate from %s"), tnl->remote.hostname);
-		gnutls_x509_crt_deinit(cert);
+	len = sizeof name;
+	result = gnutls_x509_crt_get_dn_by_oid(cert, GNUTLS_OID_X520_COMMON_NAME, 0, 0, name, &len);
+	gnutls_x509_crt_deinit(cert);
+	
+	if(result) {
+		logger(LOG_ERR, _("tnl: could not extract common name from certificate from %s: %s"), tnl->remote.hostname, gnutls_strerror(result));
 		return false;
 	}
 
-	name += 3;
-	for(p = name; *p && *p != ','; p++);
-	*p = '\0';
+	if(len > sizeof name) {
+		logger(LOG_ERR, _("tnl: common name from certificate from %s too long"), tnl->remote.hostname);
+		return false;
+	}
 
 	if(tnl->remote.id && strcmp(tnl->remote.id, name)) {
 		logger(LOG_ERR, _("tnl: peer %s is %s instead of %s"), tnl->remote.hostname, name, tnl->remote.id);
 		return false;
 	}
 
-	replace(tnl->remote.id, name);
+	replace(tnl->remote.id, xstrdup(name));
 
 	result = gnutls_certificate_verify_peers(tnl->session);
 
 	if(result < 0) {
-		logger(LOG_ERR, "tnl: error verifying certificate from %s (%s): %s\n", tnl->remote.id, tnl->remote.hostname, gnutls_strerror(result));
+		logger(LOG_ERR, "tnl: error verifying certificate from %s (%s): %s", tnl->remote.id, tnl->remote.hostname, gnutls_strerror(result));
 		return false;
 	}
 
@@ -171,19 +265,46 @@ static bool tnl_authenticate(tnl_t *tnl) {
 		logger(LOG_ERR, "tnl: certificate from %s (%s) not good, verification result %x", tnl->remote.id, tnl->remote.hostname, result);
 		return false;
 	}
+
+	return true;
 }
 
-	
+static bool tnl_authenticate(tnl_t *tnl) {
+	switch(tnl->local.cred.type) {
+		case GNUTLS_CRD_CERTIFICATE:
+			switch(gnutls_certificate_type_get(tnl->session)) {
+				case GNUTLS_CRT_X509:
+					return tnl_authenticate_x509(tnl);
+				case GNUTLS_CRT_OPENPGP:
+					//return tnl_authenticate_openpgp(tnl);
+				default:
+					logger(LOG_ERR, "tnl: unknown certificate type for session with %s (%s)", tnl->remote.id, tnl->remote.hostname);
+					return false;
+			}
+
+		case GNUTLS_CRD_ANON:
+			logger(LOG_ERR, "tnl: anonymous authentication not yet supported");
+			return false;
+
+		case GNUTLS_CRD_SRP:
+			logger(LOG_ERR, "tnl: SRP authentication not yet supported");
+			return false;
+				
+		default:
+			logger(LOG_ERR, "tnl: unknown authentication type for session with %s (%s)", tnl->remote.id, tnl->remote.hostname);
+			return false;
+	}
+}
 
 static bool tnl_handshake_handler(fd_t *fd) {
-	char id[1024];
+	//char id[1024];
 	tnl_t *tnl = fd->data;
 	int result;
 
 	result = gnutls_handshake(tnl->session);
 	if(result < 0) {
 		if(gnutls_error_is_fatal(result)) {
-			logger(LOG_ERR, "tnl: handshake error: %s\n", gnutls_strerror(result));
+			logger(LOG_ERR, "tnl: handshake error: %s", gnutls_strerror(result));
 			tnl->close(tnl);
 			return false;
 		}
@@ -197,9 +318,11 @@ static bool tnl_handshake_handler(fd_t *fd) {
 	if(!tnl_authenticate(tnl))
 		return false;
 
-	tnl->status == TNL_STATUS_UP;
+	tnl->status = TNL_STATUS_UP;
 	tnl->fd.read = tnl_recv_handler;
-	tnl->accept(tnl);
+	if(tnl->accept)
+		tnl->accept(tnl);
+
 	return true;
 }
 
@@ -233,11 +356,6 @@ static bool tnl_close(tnl_t *tnl) {
 	return true;
 }
 
-static bool tnl_accept_error(tnl_t *tnl, int errnum) {
-	logger(LOG_ERR, _("tnl: error %d on accepted tunnel"));
-	return true;
-}
-
 static bool tnl_accept_handler(fd_t *fd) {
 	tnl_listen_t *listener = fd->data;
 	tnl_t *tnl;
@@ -252,9 +370,9 @@ static bool tnl_accept_handler(fd_t *fd) {
 		return false;
 	}
 
-	logger(LOG_DEBUG, _("tnl: accepted incoming connection"));
-
 	sa_unmap(&ss);
+	
+	logger(LOG_DEBUG, _("tnl: accepted incoming connection"));
 
 	clear(new(tnl));
 	tnl->local = listener->local;
@@ -264,8 +382,8 @@ static bool tnl_accept_handler(fd_t *fd) {
 	sa_unmap(&tnl->local.address);
 	tnl->type = listener->type;
 	tnl->protocol = listener->protocol;
-	tnl->status = TNL_STATUS_CONNECTING;
-	tnl->error = tnl_accept_error;
+	tnl->send_packet = tnl_send_packet;
+	tnl->send_meta = tnl_send_meta;
 	tnl->close = tnl_close;
 
 	tnl->fd.fd = sock;
@@ -274,17 +392,19 @@ static bool tnl_accept_handler(fd_t *fd) {
 
 	fcntl(sock, F_SETFL, fcntl(sock, F_GETFL) | O_NONBLOCK);
 
+	tnl->status = TNL_STATUS_HANDSHAKE;
 	gnutls_init(&tnl->session, GNUTLS_SERVER);
 	//gnutls_handshake_set_private_extensions(tnl->session, 1);
 	gnutls_set_default_priority(tnl->session);
-	gnutls_credentials_set(tnl->session, GNUTLS_CRD_CERTIFICATE, tnl->local.cred);
+	gnutls_credentials_set(tnl->session, tnl->local.cred.type, tnl->local.cred.certificate);
 	gnutls_certificate_server_set_request(tnl->session, GNUTLS_CERT_REQUEST);
 	gnutls_transport_set_ptr(tnl->session, (gnutls_transport_ptr)sock);
-	gnutls_handshake(tnl->session);
 
 	tnl->accept = listener->accept;
 	
 	fd_add(&tnl->fd);
+
+	tnl_handshake_handler(&tnl->fd);
 	
 	return true;
 }	
@@ -298,10 +418,13 @@ static bool tnl_connect_handler(fd_t *fd) {
 	getsockopt(fd->fd, SOL_SOCKET, SO_ERROR, &result, &len);
 	if(result) {
 		logger(LOG_ERR, "tnl: error while connecting: %s", strerror(result));
-		tnl->error(tnl, result);
+		if(tnl->error)
+			tnl->error(tnl, result);
 		tnl->close(tnl);
 		return false;
 	}
+	
+	logger(LOG_DEBUG, _("tnl: connected"));
 	
 	fcntl(tnl->fd.fd, F_SETFL, fcntl(tnl->fd.fd, F_GETFL) | O_NONBLOCK);
 
@@ -309,17 +432,16 @@ static bool tnl_connect_handler(fd_t *fd) {
 	gnutls_init(&tnl->session, GNUTLS_CLIENT);
 	//gnutls_handshake_set_private_extensions(tnl->session, 1);
 	gnutls_set_default_priority(tnl->session);
-	gnutls_credentials_set(tnl->session, GNUTLS_CRD_CERTIFICATE, tnl->local.cred);
+	gnutls_credentials_set(tnl->session, tnl->local.cred.type, tnl->local.cred.certificate);
 	gnutls_certificate_server_set_request(tnl->session, GNUTLS_CERT_REQUEST);
 	gnutls_transport_set_ptr(tnl->session, (gnutls_transport_ptr)fd->fd);
-	gnutls_handshake(tnl->session);
 
 	tnl->fd.write = NULL;
 	tnl->fd.read = tnl_handshake_handler;
 	fd_mod(&tnl->fd);
 
-	logger(LOG_DEBUG, _("tnl: connected"));
-	
+	tnl_handshake_handler(&tnl->fd);
+
 	return true;
 }
 

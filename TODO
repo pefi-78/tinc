@@ -1,0 +1,20 @@
+TODO LIST
+
+* Finish tnl part
+  - Support 1.0's way of authentication (presence of key or certificate)
+  - Support signed certificates
+  - Support PGP keys
+  - Support SRP authentication
+  - Support UDP
+  - Secure PMTU detection (either 1.0's way or from a suitable RFC)
+  - Support TLS resume capability
+
+* Finish rt part
+  - Finish connection management
+  - Finish/redo graph algorithms
+  - Keep per-node statistics
+  - Support multicast routing (and snooping in switch mode)
+
+* Recreate documentation
+
+* Add management interface

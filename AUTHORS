@@ -1,0 +1,8 @@
+Main tinc authors:
+
+Guus Sliepen <guus@tinc-vpn.org>
+Ivo Timmermans <ivo@tinc-vpn.org>
+
+Also some of the macro files in the directory m4 were taken from GNU fileutils.
+
+Please see the file THANKS for more information on contributions from users.

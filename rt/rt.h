@@ -24,8 +24,11 @@
 #ifndef __RT_H__
 #define __RT_H__
 
+#include "rt/node.h"
 #include "tnl/tnl.h"
 #include "vnd/vnd.h"
+
+#define RT_PROTOCOL 0
 
 typedef enum rt_mode {
 	RT_MODE_ROUTER,
@@ -39,6 +42,11 @@ extern bool rt_hostnames;
 extern bool rt_priorityinheritance;
 extern int rt_macexpire;
 extern int rt_maxtimeout;
+extern bool rt_overwrite_mac;
+
+extern node_t *myself;
+extern vnd_t *rt_vnd;
+extern avl_tree_t *rt_tnls;
 
 extern bool rt_init(void);
 extern bool rt_exit(void);

@@ -29,28 +29,7 @@
 #include "support/xalloc.h"
 #include "tnl/tnl.h"
 
-static avl_tree_t *tnls, *listeners;
-
-bool tnl_init(void) {
-	tnls = avl_tree_new(NULL, (avl_action_t)free);
-	listeners = avl_tree_new(NULL, (avl_action_t)free);
-
-	return true;
-}
-
-bool tnl_exit(void) {
-	avl_tree_del(listeners);
-	avl_tree_del(tnls);
-
-	return true;
-}
-
-#define tnl_add(t) avl_add(tnls, t)
-#define tnl_del(t) avl_del(tnls, t)
-#define tnl_listen_add(l) avl_add(listeners, l)
-#define tnl_listen_del(l) avl_del(listeners, l)
-
-static bool tnl_send(tnl_t *tnl, const char *buf, int len) {
+static bool tnl_send(tnl_t *tnl, const void *buf, int len) {
 	int result;
 
 	while(len) {
@@ -224,22 +203,22 @@ static bool tnl_handshake_handler(fd_t *fd) {
 	return true;
 }
 
-static bool tnl_send_meta(tnl_t *tnl, const char *buf, int len) {
+static bool tnl_send_meta(tnl_t *tnl, const void *buf, int len) {
 	tnl_record_t record = {
 		.type = TNL_RECORD_META,
 		.len = len,
 	};
 
-	return tnl_send(tnl, (char *)&record, sizeof(record)) && tnl_send(tnl, buf, len);
+	return tnl_send(tnl, &record, sizeof record) && tnl_send(tnl, buf, len);
 }
 
-static bool tnl_send_packet(tnl_t *tnl, const char *buf, int len) {
+static bool tnl_send_packet(tnl_t *tnl, const void *buf, int len) {
 	tnl_record_t record = {
 		.type = TNL_RECORD_PACKET,
 		.len = len,
 	};
 
-	return tnl_send(tnl, (char *)&record, sizeof(record)) && tnl_send(tnl, buf, len);
+	return tnl_send(tnl, &record, sizeof record) && tnl_send(tnl, buf, len);
 }
 
 static bool tnl_close(tnl_t *tnl) {
@@ -251,8 +230,6 @@ static bool tnl_close(tnl_t *tnl) {
 	fd_del(&tnl->fd);
 	close(tnl->fd.fd);
 	
-	tnl_del(tnl);
-
 	return true;
 }
 
@@ -296,8 +273,6 @@ static bool tnl_accept_handler(fd_t *fd) {
 	tnl->fd.data = tnl;
 
 	fcntl(sock, F_SETFL, fcntl(sock, F_GETFL) | O_NONBLOCK);
-
-	tnl_add(tnl);
 
 	gnutls_init(&tnl->session, GNUTLS_SERVER);
 	//gnutls_handshake_set_private_extensions(tnl->session, 1);
@@ -382,8 +357,6 @@ bool tnl_connect(tnl_t *tnl) {
 	tnl->send_meta = tnl_send_meta;
 	tnl->close = tnl_close;
 	
-	tnl_add(tnl);
-
 	fd_add(&tnl->fd);
 
 	return true;
@@ -392,7 +365,6 @@ bool tnl_connect(tnl_t *tnl) {
 static bool tnl_listen_close(tnl_listen_t *listener) {
 	fd_del(&listener->fd);
 	close(listener->fd.fd);
-	tnl_listen_del(listener);
 	return true;
 }
 
@@ -421,7 +393,6 @@ bool tnl_listen(tnl_listen_t *listener) {
 	listener->fd.data = listener;
 	listener->close = tnl_listen_close;
 
-	tnl_listen_add(listener);
 	fd_add(&listener->fd);
 
 	return true;

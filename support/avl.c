@@ -611,38 +611,10 @@ bool avl_del(avl_tree_t *tree, void *data) {
 void avl_tree_del(avl_tree_t *tree) {
 	avl_node_t *node;
 
-#if 0
-	for(node = tree->root; node; node = next) {
-		next = node->next;
-		avl_free_node(tree, node);
-	}
-#endif
 	avl_foreach_node(tree, node, avl_node_free(tree, node));
 	
 	avl_tree_free(tree);
 }
-
-/* Tree walking */
-
-#if 0
-void avl_foreach(avl_tree_t *tree, avl_action_t action) {
-	avl_node_t *node, *next;
-
-	for(node = tree->head; node; node = next) {
-		next = node->next;
-		action(node->data);
-	}
-}
-
-void avl_foreach_node(avl_tree_t *tree, avl_node_action_t action) {
-	avl_node_t *node, *next;
-
-	for(node = tree->head; node; node = next) {
-		next = node->next;
-		action(node);
-	}
-}
-#endif
 
 /* Indexing */
 

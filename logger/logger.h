@@ -42,4 +42,6 @@ extern bool logger_init(const char *, logger_mode_t);
 extern bool logger_exit(void);
 extern void logger(int, const char *, ...) __attribute__ ((__format__(printf, 2, 3)));
 
+extern enum logger_level logger_level;
+
 #endif

@@ -26,6 +26,7 @@
 
 #include "rt/node.h"
 #include "support/avl.h"
+#include "tnl/tnl.h"
 
 typedef struct edge_status {
 	int visited:1;
@@ -40,6 +41,7 @@ typedef struct edge {
 	int weight;
 
 	struct edge *reverse;
+	struct tnl *tnl;
 
 	edge_status_t status;
 	node_options_t options;

@@ -24,10 +24,21 @@
 
 #include <getopt.h>
 
+/* Darwin (MacOS/X) needs the following definition... */
+#ifndef _P1003_1B_VISIBLE
+#define _P1003_1B_VISIBLE
+#endif
+
+#ifdef HAVE_SYS_MMAN_H
+#include <sys/mman.h>
+#endif
+
+#include "tincd.h"
 #include "cfg/cfg.h"
 #include "fd/event.h"
 #include "fd/fd.h"
 #include "logger/logger.h"
+#include "rt/rt.h"
 #include "support/avl.h"
 #include "support/sockaddr.h"
 #include "support/xalloc.h"
@@ -39,19 +50,21 @@ static bool show_version = false;
 static int kill_tincd = 0;
 static bool bypass_security = false;
 static bool do_mlock = false;
-static bool use_logfile = false;
 static bool do_detach = true;
 static int debug_level = 1;
 
-static char *confbase = NULL;	
-static char *identname = NULL;	
-static char *pidfilename = NULL;
-static char *logfilename = NULL;
-static char *cfgfilename = NULL;
+char *tinc_confbase = NULL;	
+char *tinc_netname = NULL;	
+char *tinc_identname = NULL;	
+char *tinc_pidfilename = NULL;
+char *tinc_logfilename = NULL;
+char *tinc_cfgfilename = NULL;
+
+bool tinc_use_logfile = false;
 
 int tinc_argc;
 char **tinc_argv;
-cfg_tree_t tinc_cfg;
+avl_tree_t *tinc_cfg;
 
 static struct option const long_options[] = {
 	{"config", required_argument, NULL, 'c'},
@@ -101,7 +114,7 @@ static bool parse_options(int argc, char **argv) {
 				break;
 
 			case 'c': /* --config */
-				confbase = xstrdup(optarg);
+				tinc_confbase = xstrdup(optarg);
 				break;
 
 			case 'D': /* --no-detach */
@@ -156,7 +169,7 @@ static bool parse_options(int argc, char **argv) {
 				break;
 
 			case 'n': /* --net */
-				netname = xstrdup(optarg);
+				tinc_netname = xstrdup(optarg);
 				break;
 
 			case 1:	/* --help */
@@ -172,13 +185,13 @@ static bool parse_options(int argc, char **argv) {
 				break;
 
 			case 4: /* --logfile */
-				use_logfile = true;
+				tinc_use_logfile = true;
 				if(optarg)
-					logfilename = xstrdup(optarg);
+					tinc_logfilename = xstrdup(optarg);
 				break;
 
 			case 5: /* --pidfile */
-				pidfilename = xstrdup(optarg);
+				tinc_pidfilename = xstrdup(optarg);
 				break;
 
 			case '?':
@@ -201,21 +214,21 @@ static void make_names(void)
 	long len = sizeof(installdir);
 #endif
 
-	if(netname)
-		asprintf(&identname, "tinc.%s", netname);
+	if(tinc_netname)
+		asprintf(&tinc_identname, "tinc.%s", tinc_netname);
 	else
-		identname = xstrdup("tinc");
+		tinc_identname = xstrdup("tinc");
 
 #ifdef HAVE_MINGW
 	if(!RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SOFTWARE\\tinc", 0, KEY_READ, &key)) {
 		if(!RegQueryValueEx(key, NULL, 0, 0, installdir, &len)) {
-			if(!logfilename)
-				asprintf(&logfilename, "%s/log/%s.log", identname);
-			if(!confbase) {
-				if(netname)
-					asprintf(&confbase, "%s/%s", installdir, netname);
+			if(!tinc_logfilename)
+				asprintf(&tinc_logfilename, "%s/log/%s.log", tinc_identname);
+			if(!tinc_confbase) {
+				if(tinc_netname)
+					asprintf(&tinc_confbase, "%s/%s", installdir, tinc_netname);
 				else
-					asprintf(&confbase, "%s", installdir);
+					asprintf(&tinc_confbase, "%s", installdir);
 			}
 		}
 		RegCloseKey(key);
@@ -224,20 +237,20 @@ static void make_names(void)
 	}
 #endif
 
-	if(!pidfilename)
-		asprintf(&pidfilename, LOCALSTATEDIR "/run/%s.pid", identname);
+	if(!tinc_pidfilename)
+		asprintf(&tinc_pidfilename, LOCALSTATEDIR "/run/%s.pid", tinc_identname);
 
-	if(!logfilename)
-		asprintf(&logfilename, LOCALSTATEDIR "/log/%s.log", identname);
+	if(!tinc_logfilename)
+		asprintf(&tinc_logfilename, LOCALSTATEDIR "/log/%s.log", tinc_identname);
 
-	if(!confbase) {
-		if(netname)
-			asprintf(&confbase, CONFDIR "/tinc/%s", netname);
+	if(!tinc_confbase) {
+		if(tinc_netname)
+			asprintf(&tinc_confbase, CONFDIR "/tinc/%s", tinc_netname);
 		else
-			asprintf(&confbase, CONFDIR "/tinc");
+			asprintf(&tinc_confbase, CONFDIR "/tinc");
 	}
 
-	asprintf(&cfgfilename, "%s/tinc.conf", confbase);
+	asprintf(&tinc_cfgfilename, "%s/tinc.conf", tinc_confbase);
 }
 
 int main(int argc, char **argv) {
@@ -254,8 +267,8 @@ int main(int argc, char **argv) {
 	make_names();
 
 	if(show_version) {
-		printf(_("%s version %s (built %s %s, protocol %d)\n"), PACKAGE,
-			   VERSION, __DATE__, __TIME__, PROT_CURRENT);
+		printf(_("%s version %s (built %s %s, protocol %d/%d)\n"), PACKAGE,
+			   VERSION, __DATE__, __TIME__, TNL_PROTOCOL, RT_PROTOCOL);
 		printf(_("Copyright (C) 1998-2004 Ivo Timmermans, Guus Sliepen and others.\n"
 				"See the AUTHORS file for a complete list.\n\n"
 				"tinc comes with ABSOLUTELY NO WARRANTY.  This is free software,\n"
@@ -273,7 +286,7 @@ int main(int argc, char **argv) {
 	if(kill_tincd)
 		return !kill_other(kill_tincd);
 
-	openlogger("tinc", use_logfile?LOGMODE_FILE:LOGMODE_STDERR);
+	logger_init("tinc", tinc_use_logfile ? LOGGER_MODE_FILE : LOGGER_MODE_STDERR);
 
 	/* Lock all pages into memory if requested */
 
@@ -291,9 +304,9 @@ int main(int argc, char **argv) {
 
 	tinc_cfg = cfg_tree_new();
 
-	asprintf(cfgfilename, "%s/tinc.conf", confbase);
+	asprintf(&tinc_cfgfilename, "%s/tinc.conf", tinc_confbase);
 	
-	if(!cfg_read_file(tinc_cfg, cfgfilename))
+	if(!cfg_read_file(tinc_cfg, tinc_cfgfilename))
 		return 1;
 
 #ifdef HAVE_MINGW
@@ -306,19 +319,21 @@ int main(int argc, char **argv) {
 	if(do_detach && !detach())
 		return 1;
 
-	if(!fd_init() || !tnl_init() || !rt_init())
+	logger(LOG_NOTICE, _("tincd %s (%s %s) starting, debug level %d"),
+			VERSION, __DATE__, __TIME__, logger_level);
+
+	if(!fd_init() || !rt_init())
 		return 1;
 
 	fd_run();
 
 	rt_exit();
-	tnl_exit();
 	fd_exit();
 end:
 	logger(LOG_NOTICE, _("Terminating"));
 
 #ifndef HAVE_MINGW
-	remove_pid(pidfilename);
+	remove_pid(tinc_pidfilename);
 #endif
 
 	logger_exit();

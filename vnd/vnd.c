@@ -51,7 +51,7 @@ void vnd_set(vnd_t *vnd, char *device, char *interface, vnd_mode_t mode, vnd_han
 	vnd->recv = recv;
 }
 
-static bool vnd_send(vnd_t *vnd, char *buf, int len) {
+static bool vnd_send(vnd_t *vnd, const void *buf, int len) {
 	int result;
 
 	result = write(vnd->fd.fd, buf, len);
@@ -73,7 +73,7 @@ static bool vnd_recv_handler(fd_t *fd) {
 
 	vnd = fd->data;
 
-	len = read(fd->fd, buf, sizeof(buf));
+	len = read(fd->fd, buf, sizeof buf);
 
 	if(len > 0) {
 		logger(LOG_INFO, _("vnd: read packet of %d bytes from %s"), len, vnd->description);

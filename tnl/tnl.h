@@ -27,6 +27,8 @@
 
 #include "fd/fd.h"
 
+#define TNL_PROTOCOL 0
+
 #define TNL_RECORD_PACKET 0
 #define TNL_RECORD_META 1
 #define TNL_RECORD_HELLO 2
@@ -62,12 +64,12 @@ typedef struct tnl {
 	enum tnl_status status;
 	void *data;
 
-	bool (*send_packet)(struct tnl *tnl, const char *buf, int len);
-	bool (*send_meta)(struct tnl *tnl, const char *buf, int len);
+	bool (*send_packet)(struct tnl *tnl, const void *buf, int len);
+	bool (*send_meta)(struct tnl *tnl, const void *buf, int len);
 	bool (*close)(struct tnl *tnl);
 
-	bool (*recv_packet)(struct tnl *tnl, const char *buf, int len);
-	bool (*recv_meta)(struct tnl *tnl, const char *buf, int len);
+	bool (*recv_packet)(struct tnl *tnl, const void *buf, int len);
+	bool (*recv_meta)(struct tnl *tnl, const void *buf, int len);
 	bool (*accept)(struct tnl *tnl);
 	bool (*error)(struct tnl *tnl, int errnum);
 
@@ -90,8 +92,6 @@ typedef struct tnl_listen {
 	struct fd fd;
 } tnl_listen_t;
 
-extern bool tnl_init(void);
-extern bool tnl_exit(void);
 extern bool tnl_listen(struct tnl_listen *listener);
 extern bool tnl_connect(struct tnl *tnl);
 

@@ -2,15 +2,17 @@ AUTOMAKE_OPTIONS = gnu
 
 EXTRA_DIST = config.rpath mkinstalldirs system.h depcomp
 
-SUBDIRS = cfg fd logger support tnl vnd
+SUBDIRS = cfg fd logger rt support tnl vnd
 
 sbin_PROGRAMS = tincd
 
-tincd_SOURCES = tincd.c
+tincd_SOURCES = process.c tincd.c
 
-tincd_LDADD = cfg/libcfg.a fd/libfd.a logger/liblogger.a support/libsupport.a tnl/libtnl.a vnd/libvnd.a -lgnutls
+tincd_LDADD = cfg/libcfg.a fd/libfd.a logger/liblogger.a rt/librt.a support/libsupport.a tnl/libtnl.a vnd/libvnd.a -lgnutls
 
 ACLOCAL_AMFLAGS = -I m4 
+
+AM_CFLAGS = @CFLAGS@ -DCONFDIR=\"$(sysconfdir)\" -DLOCALEDIR=\"$(localedir)\" -DLOCALSTATEDIR=\"$(localstatedir)\"
 
 ChangeLog:
 	svn log > ChangeLog

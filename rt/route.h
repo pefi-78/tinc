@@ -1,5 +1,5 @@
 /*
-    vnd.c -- virtual network device management
+    route.h -- routing
 
     Copyright (C) 2003-2004 Guus Sliepen <guus@tinc-vpn.org>,
                   2003-2004 Ivo Timmermans <ivo@tinc-vpn.org>
@@ -18,42 +18,14 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-    $Id$
+    $Id: rt.h 1375 2004-03-22 12:30:39Z guus $
 */
 
-#ifndef __VND_H__
-#define __VND_H__
+#ifndef __ROUTE_H__
+#define __ROUTE_H__
 
-typedef enum vnd_mode{
-	VND_MODE_TUN,
-	VND_MODE_TAP,
-} vnd_mode_t;
+#include "rt/node.h"
 
-struct vnd;
+extern void route(node_t *, const uint8_t *, int);
 
-typedef bool (*vnd_handler_t)(struct vnd *vnd, const void *buf, int len);
-
-typedef struct vnd {
-	char *device;
-	char *interface;
-	enum vnd_mode mode;
-	int mtu;
-
-	vnd_handler_t recv;
-	vnd_handler_t send;
-
-	/* Private data */
-
-	struct fd fd;
-	char *description;
-} vnd_t;
-
-extern bool vnd_init(void);
-extern bool vnd_exit(void);
-extern struct vnd *vnd_new(void);
-extern void vnd_free(struct vnd *vnd);
-extern void vnd_set(struct vnd *vnd, char *device, char *interface, vnd_mode_t mode, vnd_handler_t recv);
-extern bool vnd_open(struct vnd *vnd);
-extern bool vnd_close(struct vnd *vnd);
-
-#endif /* __VND_H__ */
+#endif

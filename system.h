@@ -138,9 +138,9 @@ typedef int bool;
 
 /* Include localisation support */
 
-#if 0
+#include "support/gettext.h"
 
-#include "gettext.h"
+#if 0
 
 #ifndef HAVE_STRSIGNAL
 # define strsignal(p) ""
@@ -151,8 +151,6 @@ typedef int bool;
 #include "dropin.h"
 
 #endif
-
-#define _(a) a
 
 #ifndef HAVE_SOCKLEN_T
 typedef int socklen_t;

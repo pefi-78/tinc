@@ -1,0 +1,31 @@
+Routing subsystem
+=================
+
+The routing part of tinc reads/writes packets to/from the virtual network
+device, sets up tunnels on demand and routes packets to/from the virtual
+network device and the tunnels.  It can also exchange information about other
+daemons using the tunnels.
+
+The following datatypes are used in this subsystem:
+
+struct node
+-----------
+
+This represents a tinc daemon. It keeps track of the best way to reach this
+daemon (if it is reachable at all), which subnets are associated with this
+daemon, and the connections it has with other daemons.
+
+struct subnet
+-------------
+
+This represents a subnet, can have an expiry time and is associated with a node.
+
+struct edge
+-----------
+
+This represents a connection from one tinc daemon to another. The edges have a
+specific direction, and normally if there really is a connection between tinc
+daemon A and B, there will be two edges, A -> B and B -> A.  This seems
+redundant, but is necessary to allow disparities between information learned
+from A and information learned from B.
+

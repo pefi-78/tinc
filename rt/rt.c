@@ -40,26 +40,32 @@ int rt_maxtimeout = 900;
 rt_mode_t rt_mode = RT_MODE_ROUTER;
 bool rt_priorityinheritance = false;
 bool rt_hostnames = false;
+bool rt_overwrite_mac = false;
+
+avl_tree_t *rt_tnls;
+avl_tree_t *rt_listeners;
 
 static bool rt_tnl_accept(tnl_t *t) {
+	
 }
 
-static bool rt_vnd_recv(vnd_t *vnd, const char *buf, int len) {
+static bool rt_vnd_recv(vnd_t *vnd, const void *buf, int len) {
 	route(myself, buf, len);
 }
 
-static bool rt_tnl_recv_packet(tnl_t *tnl, const char *buf, int len) {
-	route(tnl->data, buf, len);
+static bool rt_tnl_recv_packet(tnl_t *tnl, const void *buf, int len) {
+	edge_t *edge = tnl->data;
+	route(edge->to, buf, len);
 }
 
-static bool rt_tnl_recv_meta(tnl_t *tnl, const char *buf, int len) {
-	//route(tnl->data, buf, len);
+static bool rt_tnl_recv_meta(tnl_t *tnl, const void *buf, int len) {
 }
 
-static void rt_outgoing(char *wft) {
-}
+static void rt_outgoing(char *name) {
+	tnl_t *tnl;
 
-static void route(node_t *node, char *buf, int len) {
+	clear(new(tnl));
+	
 }
 
 bool rt_init(void) {
@@ -91,6 +97,9 @@ bool rt_init(void) {
 
 	if(!subnet_init() || !node_init() || !edge_init())
 		return false;
+
+	rt_tnls = avl_tree_new(NULL, NULL);
+	rt_listeners = avl_tree_new(NULL, NULL);
 
 	/* Read main configuration */
 
@@ -157,8 +166,9 @@ bool rt_init(void) {
 		
 		clear(new(listener));
 		listener->local.address = *(struct sockaddr_storage *)aip->ai_addr;
-		listener->local.id = myself;
+		listener->local.id = myself->name;
 		// listener->local.cred = ...;
+		listener->accept = rt_tnl_accept;
 
 		if(tnl_listen(listener))
 			listeners++;

@@ -26,7 +26,7 @@
 
 typedef int node_options_t;
 
-#define NODE_OPTIONS_INDIRECT 1
+#define NODE_OPTION_INDIRECT 1
 
 #include "rt/edge.h"
 #include "rt/subnet.h"

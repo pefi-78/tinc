@@ -134,11 +134,6 @@ extern struct avl_node *avl_get_closest_greater_node(const struct avl_tree *, co
 	} \
 }
 
-#if 0
-extern void avl_foreach(struct avl_tree *, avl_action_t);
-extern void avl_foreach_node(struct avl_tree *, avl_node_action_t);
-#endif
-
 /* Indexing */
 
 #ifdef AVL_COUNT

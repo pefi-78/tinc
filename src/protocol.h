@@ -80,10 +80,6 @@ extern void age_past_requests(void);
 
 /* Requests */
 
-extern bool send_id(struct connection_t *);
-extern bool send_metakey(struct connection_t *);
-extern bool send_challenge(struct connection_t *);
-extern bool send_chal_reply(struct connection_t *);
 extern bool send_ack(struct connection_t *);
 extern bool send_status(struct connection_t *, int, const char *);
 extern bool send_error(struct connection_t *, int,const  char *);
@@ -96,15 +92,11 @@ extern bool send_add_edge(struct connection_t *, const struct edge_t *);
 extern bool send_del_edge(struct connection_t *, const struct edge_t *);
 extern bool send_key_changed(struct connection_t *, const struct node_t *);
 extern bool send_req_key(struct connection_t *, const struct node_t *, const struct node_t *);
-extern bool send_ans_key(struct connection_t *, const struct node_t *, const struct node_t *);
+extern bool send_ans_key(struct connection_t *, const struct node_t *);
 extern bool send_tcppacket(struct connection_t *, struct vpn_packet_t *);
 
 /* Request handlers  */
 
-extern bool id_h(struct connection_t *);
-extern bool metakey_h(struct connection_t *);
-extern bool challenge_h(struct connection_t *);
-extern bool chal_reply_h(struct connection_t *);
 extern bool ack_h(struct connection_t *);
 extern bool status_h(struct connection_t *);
 extern bool error_h(struct connection_t *);

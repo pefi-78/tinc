@@ -22,8 +22,7 @@
 
 #include "system.h"
 
-#include <openssl/err.h>
-#include <openssl/evp.h>
+#include <gnutls/gnutls.h>
 
 #include "avl_tree.h"
 #include "connection.h"
@@ -36,9 +35,6 @@
 
 bool send_meta(connection_t *c, const char *buffer, int length)
 {
-	const char *bufp;
-	int outlen;
-	char outbuf[MAXBUFSIZE];
 	int result;
 
 	cp();
@@ -46,32 +42,21 @@ bool send_meta(connection_t *c, const char *buffer, int length)
 	ifdebug(META) logger(LOG_DEBUG, _("Sending %d bytes of metadata to %s (%s)"), length,
 			   c->name, c->hostname);
 
-	if(c->status.encryptout) {
-		result = EVP_EncryptUpdate(c->outctx, outbuf, &outlen, buffer, length);
-		if(!result || outlen != length) {
-			logger(LOG_ERR, _("Error while encrypting metadata to %s (%s): %s"),
-					c->name, c->hostname, ERR_error_string(ERR_get_error(), NULL));
-			return false;
-		}
-		bufp = outbuf;
-		length = outlen;
-	} else
-		bufp = buffer;
-
 	while(length) {
-		result = send(c->socket, bufp, length, 0);
+		result = gnutls_record_send(c->session, buffer, length);
+
 		if(result <= 0) {
-			if(!errno || errno == EPIPE) {
+			if(!result) {
 				ifdebug(CONNECTIONS) logger(LOG_NOTICE, _("Connection closed by %s (%s)"),
 						   c->name, c->hostname);
-			} else if(errno == EINTR)
+			} else if(result == GNUTLS_E_INTERRUPTED || result == GNUTLS_E_AGAIN)
 				continue;
 			else
 				logger(LOG_ERR, _("Sending meta data to %s (%s) failed: %s"), c->name,
-					   c->hostname, strerror(errno));
+					   c->hostname, gnutls_strerror(result));
 			return false;
 		}
-		bufp += result;
+		buffer += result;
 		length -= result;
 	}
 	
@@ -96,53 +81,51 @@ void broadcast_meta(connection_t *from, const char *buffer, int length)
 bool receive_meta(connection_t *c)
 {
 	int oldlen, i, result;
-	int lenin, lenout, reqlen;
-	bool decrypted = false;
-	char inbuf[MAXBUFSIZE];
+	int reqlen;
 
 	cp();
 
 	/* Strategy:
 	   - Read as much as possible from the TCP socket in one go.
-	   - Decrypt it.
 	   - Check if a full request is in the input buffer.
 	   - If yes, process request and remove it from the buffer,
 	   then check again.
 	   - If not, keep stuff in buffer and exit.
 	 */
 
-	lenin = recv(c->socket, c->buffer + c->buflen, MAXBUFSIZE - c->buflen, 0);
+	if(c->allow_request == ID) {
+		logger(LOG_DEBUG, _("Continuing handshake..."));
+		result = gnutls_handshake(c->session);
+		if(!result) {
+			logger(LOG_DEBUG, _("Handshake with %s (%s) completed!"), c->name, c->hostname);
+			c->allow_request = ACK;
+			return send_ack(c);
+		}
+		if(result == GNUTLS_E_INTERRUPTED || result == GNUTLS_E_AGAIN)
+			return true;
+		logger(LOG_DEBUG, _("Handshake with %s (%s) failed: %s"), c->name, c->hostname, gnutls_strerror(result));
+		return false;
+	}
 
-	if(lenin <= 0) {
-		if(!lenin || !errno) {
+	result = gnutls_record_recv(c->session, c->buffer + c->buflen, MAXBUFSIZE - c->buflen);
+
+	if(result <= 0) {
+		if(!result) {
 			ifdebug(CONNECTIONS) logger(LOG_NOTICE, _("Connection closed by %s (%s)"),
 					   c->name, c->hostname);
-		} else if(errno == EINTR)
+		} else if(result == GNUTLS_E_INTERRUPTED || result == GNUTLS_E_AGAIN)
 			return true;
 		else
 			logger(LOG_ERR, _("Metadata socket read error for %s (%s): %s"),
-				   c->name, c->hostname, strerror(errno));
+				   c->name, c->hostname, gnutls_strerror(result));
 
 		return false;
 	}
 
 	oldlen = c->buflen;
-	c->buflen += lenin;
+	c->buflen += result;
 
-	while(lenin > 0) {
-		/* Decrypt */
-
-		if(c->status.decryptin && !decrypted) {
-			result = EVP_DecryptUpdate(c->inctx, inbuf, &lenout, c->buffer + oldlen, lenin);
-			if(!result || lenout != lenin) {
-				logger(LOG_ERR, _("Error while decrypting metadata from %s (%s): %s"),
-						c->name, c->hostname, ERR_error_string(ERR_get_error(), NULL));
-				return false;
-			}
-			memcpy(c->buffer + oldlen, inbuf, lenin);
-			decrypted = true;
-		}
-
+	while(c->buflen > 0) {
 		/* Are we receiving a TCPpacket? */
 
 		if(c->tcplen) {
@@ -150,7 +133,6 @@ bool receive_meta(connection_t *c)
 				receive_tcppacket(c, c->buffer, c->tcplen);
 
 				c->buflen -= c->tcplen;
-				lenin -= c->tcplen - oldlen;
 				memmove(c->buffer, c->buffer + c->tcplen, c->buflen);
 				oldlen = 0;
 				c->tcplen = 0;
@@ -178,7 +160,6 @@ bool receive_meta(connection_t *c)
 				return false;
 
 			c->buflen -= reqlen;
-			lenin -= reqlen - oldlen;
 			memmove(c->buffer, c->buffer + reqlen, c->buflen);
 			oldlen = 0;
 			continue;

@@ -31,10 +31,7 @@
 #include <sys/mman.h>
 #endif
 
-#include <openssl/rand.h>
-#include <openssl/rsa.h>
-#include <openssl/pem.h>
-#include <openssl/evp.h>
+#include <gnutls/gnutls.h>
 
 #include <lzo1x.h>
 
@@ -286,6 +283,10 @@ static void indicator(int a, int b, void *p)
 */
 static bool keygen(int bits)
 {
+	fprintf(stderr, _("Use certtool!\n"));
+	return false;
+
+#if 0
 	RSA *rsa_key;
 	FILE *f;
 	char *name = NULL;
@@ -338,6 +339,7 @@ static bool keygen(int bits)
 	free(filename);
 
 	return true;
+#endif
 }
 
 /*
@@ -437,7 +439,7 @@ int main(int argc, char **argv)
 	{
 		logger(LOG_ERR, _("mlockall() not supported on this platform!"));
 #endif
-		return -1;
+		return 1;
 	}
 
 	g_argv = argv;
@@ -446,9 +448,7 @@ int main(int argc, char **argv)
 
 	/* Slllluuuuuuurrrrp! */
 
-	RAND_load_file("/dev/urandom", 1024);
-
-	OpenSSL_add_all_algorithms();
+	gnutls_global_init();
 
 	if(generate_keys) {
 		read_server_config();

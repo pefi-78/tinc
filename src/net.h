@@ -23,7 +23,7 @@
 #ifndef __TINC_NET_H__
 #define __TINC_NET_H__
 
-#include <openssl/evp.h>
+#include <gcrypt.h>
 
 #include "ipv6.h"
 
@@ -33,7 +33,7 @@
 #define MTU 1514				/* 1500 bytes payload + 14 bytes ethernet header */
 #endif
 
-#define MAXSIZE (MTU + 4 + EVP_MAX_BLOCK_LENGTH + EVP_MAX_MD_SIZE + MTU/64 + 20)	/* MTU + seqno + padding + HMAC + compressor overhead */
+#define MAXSIZE (MTU + 4 + 64 + 64 + MTU/64 + 20)	/* MTU + seqno + padding + HMAC + compressor overhead */
 #define MAXBUFSIZE ((MAXSIZE > 2048 ? MAXSIZE : 2048) + 128)	/* Enough room for a request with a MAXSIZEd packet or a 8192 bits RSA key */
 
 #define MAXSOCKETS 128			/* Overkill... */
@@ -126,7 +126,8 @@ extern bool do_prune;
 extern bool do_purge;
 extern char *myport;
 extern time_t now;
-extern EVP_CIPHER_CTX packet_ctx;
+extern gcry_cipher_hd_t packet_ctx;
+extern gcry_md_hd_t digest_ctx;
 
 /* Yes, very strange placement indeed, but otherwise the typedefs get all tangled up */
 #include "connection.h"

@@ -22,10 +22,8 @@
 
 #include "system.h"
 
-#include <openssl/sha.h>
-#include <openssl/rand.h>
-#include <openssl/err.h>
-#include <openssl/evp.h>
+#include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
 
 #include "avl_tree.h"
 #include "conf.h"
@@ -40,60 +38,70 @@
 #include "utils.h"
 #include "xalloc.h"
 
-bool send_id(connection_t *c)
+bool send_ack(connection_t *c)
 {
-	cp();
+	char buf[MAX_STRING_SIZE];
+	size_t len;
+	gnutls_x509_crt cert;
+	const gnutls_datum *cert_list;
+	int cert_list_size = 0, result;
+	char *p, *name;
 
-	return send_request(c, "%d %s %d", ID, myself->connection->name,
-						myself->connection->protocol_version);
-}
+	cert_list = gnutls_certificate_get_peers(c->session, &cert_list_size);
 
-bool id_h(connection_t *c)
-{
-	char name[MAX_STRING_SIZE];
-
-	cp();
-
-	if(sscanf(c->buffer, "%*d " MAX_STRING " %d", name, &c->protocol_version) != 2) {
-		logger(LOG_ERR, _("Got bad %s from %s (%s)"), "ID", c->name,
-			   c->hostname);
+	if (!cert_list || !cert_list_size) {
+		logger(LOG_ERR, _("No certificates from %s"), c->hostname);
 		return false;
 	}
 
-	/* Check if identity is a valid name */
+	len = sizeof buf;
+	gnutls_x509_crt_init(&cert);
+	result = gnutls_x509_crt_import(cert, &cert_list[0], GNUTLS_X509_FMT_DER)
+		?: gnutls_x509_crt_get_dn(cert, buf, &len);
+
+	if(result) {
+		logger(LOG_ERR, _("Error importing certificate from %s: %s"), c->hostname, gnutls_strerror(errno));
+		gnutls_x509_crt_deinit(cert);
+		return false;
+	}
+
+	name = strstr(buf, "CN=");
+	if(!name) {
+		logger(LOG_ERR, _("No name in certificate from %s"), c->hostname);
+		gnutls_x509_crt_deinit(cert);
+		return false;
+	}
+	name += 3;
+	for(p = name; *p && *p != ','; p++);
+	*p = '\0';
 
 	if(!check_id(name)) {
-		logger(LOG_ERR, _("Got bad %s from %s (%s): %s"), "ID", c->name,
-			   c->hostname, "invalid name");
+		logger(LOG_ERR, _("Invalid name from %s"), c->hostname);
 		return false;
 	}
-
-	/* If we set c->name in advance, make sure we are connected to the right host */
 
 	if(c->name) {
 		if(strcmp(c->name, name)) {
-			logger(LOG_ERR, _("Peer %s is %s instead of %s"), c->hostname, name,
-				   c->name);
+			logger(LOG_ERR, _("Peer %s is %s instead of %s"), c->hostname, name, c->hostname);
 			return false;
 		}
-	} else
+	} else {
 		c->name = xstrdup(name);
-
-	/* Check if version matches */
-
-	if(c->protocol_version != myself->connection->protocol_version) {
-		logger(LOG_ERR, _("Peer %s (%s) uses incompatible version %d"),
-			   c->name, c->hostname, c->protocol_version);
-		return false;
 	}
+	
+	result = gnutls_certificate_verify_peers(c->session);
 
-	if(bypass_security) {
-		if(!c->config_tree)
-			init_configuration(&c->config_tree);
-		c->allow_request = ACK;
-		return send_ack(c);
+	if(result) {
+		if(result & GNUTLS_CERT_INVALID)
+			logger(LOG_ERR, _("Certificate from %s (%s) invalid"), c->name, c->hostname);
+		if(result & GNUTLS_CERT_REVOKED)
+			logger(LOG_ERR, _("Certificate from %s (%s) revoked"), c->name, c->hostname);
+		if(result & GNUTLS_CERT_SIGNER_NOT_FOUND)
+			logger(LOG_ERR, _("Certificate from %s (%s) has no known signer"), c->name, c->hostname);
+		if(result & GNUTLS_CERT_SIGNER_NOT_CA)
+			logger(LOG_ERR, _("Certificate from %s (%s) has no CA as signer"), c->name, c->hostname);
 	}
-
+	
 	if(!c->config_tree) {
 		init_configuration(&c->config_tree);
 
@@ -104,357 +112,6 @@ bool id_h(connection_t *c)
 		}
 	}
 
-	if(!read_rsa_public_key(c)) {
-		return false;
-	}
-
-	c->allow_request = METAKEY;
-
-	return send_metakey(c);
-}
-
-bool send_metakey(connection_t *c)
-{
-	char buffer[MAX_STRING_SIZE];
-	int len;
-	bool x;
-
-	cp();
-
-	len = RSA_size(c->rsa_key);
-
-	/* Allocate buffers for the meta key */
-
-	if(!c->outkey)
-		c->outkey = xmalloc(len);
-
-	if(!c->outctx)
-		c->outctx = xmalloc_and_zero(sizeof(*c->outctx));
-	cp();
-	/* Copy random data to the buffer */
-
-	RAND_pseudo_bytes(c->outkey, len);
-
-	/* The message we send must be smaller than the modulus of the RSA key.
-	   By definition, for a key of k bits, the following formula holds:
-
-	   2^(k-1) <= modulus < 2^(k)
-
-	   Where ^ means "to the power of", not "xor".
-	   This means that to be sure, we must choose our message < 2^(k-1).
-	   This can be done by setting the most significant bit to zero.
-	 */
-
-	c->outkey[0] &= 0x7F;
-
-	ifdebug(SCARY_THINGS) {
-		bin2hex(c->outkey, buffer, len);
-		buffer[len * 2] = '\0';
-		logger(LOG_DEBUG, _("Generated random meta key (unencrypted): %s"),
-			   buffer);
-	}
-
-	/* Encrypt the random data
-
-	   We do not use one of the PKCS padding schemes here.
-	   This is allowed, because we encrypt a totally random string
-	   with a length equal to that of the modulus of the RSA key.
-	 */
-
-	if(RSA_public_encrypt(len, c->outkey, buffer, c->rsa_key, RSA_NO_PADDING) != len) {
-		logger(LOG_ERR, _("Error during encryption of meta key for %s (%s)"),
-			   c->name, c->hostname);
-		return false;
-	}
-
-	/* Convert the encrypted random data to a hexadecimal formatted string */
-
-	bin2hex(buffer, buffer, len);
-	buffer[len * 2] = '\0';
-
-	/* Send the meta key */
-
-	x = send_request(c, "%d %d %d %d %d %s", METAKEY,
-					 c->outcipher ? c->outcipher->nid : 0,
-					 c->outdigest ? c->outdigest->type : 0, c->outmaclength,
-					 c->outcompression, buffer);
-
-	/* Further outgoing requests are encrypted with the key we just generated */
-
-	if(c->outcipher) {
-		if(!EVP_EncryptInit(c->outctx, c->outcipher,
-					c->outkey + len - c->outcipher->key_len,
-					c->outkey + len - c->outcipher->key_len -
-					c->outcipher->iv_len)) {
-			logger(LOG_ERR, _("Error during initialisation of cipher for %s (%s): %s"),
-					c->name, c->hostname, ERR_error_string(ERR_get_error(), NULL));
-			return false;
-		}
-
-		c->status.encryptout = true;
-	}
-
-	return x;
-}
-
-bool metakey_h(connection_t *c)
-{
-	char buffer[MAX_STRING_SIZE];
-	int cipher, digest, maclength, compression;
-	int len;
-
-	cp();
-
-	if(sscanf(c->buffer, "%*d %d %d %d %d " MAX_STRING, &cipher, &digest, &maclength, &compression, buffer) != 5) {
-		logger(LOG_ERR, _("Got bad %s from %s (%s)"), "METAKEY", c->name,
-			   c->hostname);
-		return false;
-	}
-
-	len = RSA_size(myself->connection->rsa_key);
-
-	/* Check if the length of the meta key is all right */
-
-	if(strlen(buffer) != len * 2) {
-		logger(LOG_ERR, _("Possible intruder %s (%s): %s"), c->name, c->hostname, "wrong keylength");
-		return false;
-	}
-
-	/* Allocate buffers for the meta key */
-
-	if(!c->inkey)
-		c->inkey = xmalloc(len);
-
-	if(!c->inctx)
-		c->inctx = xmalloc_and_zero(sizeof(*c->inctx));
-
-	/* Convert the challenge from hexadecimal back to binary */
-
-	hex2bin(buffer, buffer, len);
-
-	/* Decrypt the meta key */
-
-	if(RSA_private_decrypt(len, buffer, c->inkey, myself->connection->rsa_key, RSA_NO_PADDING) != len) {	/* See challenge() */
-		logger(LOG_ERR, _("Error during encryption of meta key for %s (%s)"),
-			   c->name, c->hostname);
-		return false;
-	}
-
-	ifdebug(SCARY_THINGS) {
-		bin2hex(c->inkey, buffer, len);
-		buffer[len * 2] = '\0';
-		logger(LOG_DEBUG, _("Received random meta key (unencrypted): %s"), buffer);
-	}
-
-	/* All incoming requests will now be encrypted. */
-
-	/* Check and lookup cipher and digest algorithms */
-
-	if(cipher) {
-		c->incipher = EVP_get_cipherbynid(cipher);
-		
-		if(!c->incipher) {
-			logger(LOG_ERR, _("%s (%s) uses unknown cipher!"), c->name, c->hostname);
-			return false;
-		}
-
-		if(!EVP_DecryptInit(c->inctx, c->incipher,
-					c->inkey + len - c->incipher->key_len,
-					c->inkey + len - c->incipher->key_len -
-					c->incipher->iv_len)) {
-			logger(LOG_ERR, _("Error during initialisation of cipher from %s (%s): %s"),
-					c->name, c->hostname, ERR_error_string(ERR_get_error(), NULL));
-			return false;
-		}
-
-		c->status.decryptin = true;
-	} else {
-		c->incipher = NULL;
-	}
-
-	c->inmaclength = maclength;
-
-	if(digest) {
-		c->indigest = EVP_get_digestbynid(digest);
-
-		if(!c->indigest) {
-			logger(LOG_ERR, _("Node %s (%s) uses unknown digest!"), c->name, c->hostname);
-			return false;
-		}
-
-		if(c->inmaclength > c->indigest->md_size || c->inmaclength < 0) {
-			logger(LOG_ERR, _("%s (%s) uses bogus MAC length!"), c->name, c->hostname);
-			return false;
-		}
-	} else {
-		c->indigest = NULL;
-	}
-
-	c->incompression = compression;
-
-	c->allow_request = CHALLENGE;
-
-	return send_challenge(c);
-}
-
-bool send_challenge(connection_t *c)
-{
-	char buffer[MAX_STRING_SIZE];
-	int len;
-
-	cp();
-
-	/* CHECKME: what is most reasonable value for len? */
-
-	len = RSA_size(c->rsa_key);
-
-	/* Allocate buffers for the challenge */
-
-	if(!c->hischallenge)
-		c->hischallenge = xmalloc(len);
-
-	/* Copy random data to the buffer */
-
-	RAND_pseudo_bytes(c->hischallenge, len);
-
-	/* Convert to hex */
-
-	bin2hex(c->hischallenge, buffer, len);
-	buffer[len * 2] = '\0';
-
-	/* Send the challenge */
-
-	return send_request(c, "%d %s", CHALLENGE, buffer);
-}
-
-bool challenge_h(connection_t *c)
-{
-	char buffer[MAX_STRING_SIZE];
-	int len;
-
-	cp();
-
-	if(sscanf(c->buffer, "%*d " MAX_STRING, buffer) != 1) {
-		logger(LOG_ERR, _("Got bad %s from %s (%s)"), "CHALLENGE", c->name,
-			   c->hostname);
-		return false;
-	}
-
-	len = RSA_size(myself->connection->rsa_key);
-
-	/* Check if the length of the challenge is all right */
-
-	if(strlen(buffer) != len * 2) {
-		logger(LOG_ERR, _("Possible intruder %s (%s): %s"), c->name,
-			   c->hostname, "wrong challenge length");
-		return false;
-	}
-
-	/* Allocate buffers for the challenge */
-
-	if(!c->mychallenge)
-		c->mychallenge = xmalloc(len);
-
-	/* Convert the challenge from hexadecimal back to binary */
-
-	hex2bin(buffer, c->mychallenge, len);
-
-	c->allow_request = CHAL_REPLY;
-
-	/* Rest is done by send_chal_reply() */
-
-	return send_chal_reply(c);
-}
-
-bool send_chal_reply(connection_t *c)
-{
-	char hash[EVP_MAX_MD_SIZE * 2 + 1];
-	EVP_MD_CTX ctx;
-
-	cp();
-
-	/* Calculate the hash from the challenge we received */
-
-	if(!EVP_DigestInit(&ctx, c->indigest)
-			|| !EVP_DigestUpdate(&ctx, c->mychallenge, RSA_size(myself->connection->rsa_key))
-			|| !EVP_DigestFinal(&ctx, hash, NULL)) {
-		logger(LOG_ERR, _("Error during calculation of response for %s (%s): %s"),
-			c->name, c->hostname, ERR_error_string(ERR_get_error(), NULL));
-		return false;
-	}
-
-	/* Convert the hash to a hexadecimal formatted string */
-
-	bin2hex(hash, hash, c->indigest->md_size);
-	hash[c->indigest->md_size * 2] = '\0';
-
-	/* Send the reply */
-
-	return send_request(c, "%d %s", CHAL_REPLY, hash);
-}
-
-bool chal_reply_h(connection_t *c)
-{
-	char hishash[MAX_STRING_SIZE];
-	char myhash[EVP_MAX_MD_SIZE];
-	EVP_MD_CTX ctx;
-
-	cp();
-
-	if(sscanf(c->buffer, "%*d " MAX_STRING, hishash) != 1) {
-		logger(LOG_ERR, _("Got bad %s from %s (%s)"), "CHAL_REPLY", c->name,
-			   c->hostname);
-		return false;
-	}
-
-	/* Check if the length of the hash is all right */
-
-	if(strlen(hishash) != c->outdigest->md_size * 2) {
-		logger(LOG_ERR, _("Possible intruder %s (%s): %s"), c->name,
-			   c->hostname, _("wrong challenge reply length"));
-		return false;
-	}
-
-	/* Convert the hash to binary format */
-
-	hex2bin(hishash, hishash, c->outdigest->md_size);
-
-	/* Calculate the hash from the challenge we sent */
-
-	if(!EVP_DigestInit(&ctx, c->outdigest)
-			|| !EVP_DigestUpdate(&ctx, c->hischallenge, RSA_size(c->rsa_key))
-			|| !EVP_DigestFinal(&ctx, myhash, NULL)) {
-		logger(LOG_ERR, _("Error during calculation of response from %s (%s): %s"),
-			c->name, c->hostname, ERR_error_string(ERR_get_error(), NULL));
-		return false;
-	}
-
-	/* Verify the incoming hash with the calculated hash */
-
-	if(memcmp(hishash, myhash, c->outdigest->md_size)) {
-		logger(LOG_ERR, _("Possible intruder %s (%s): %s"), c->name,
-			   c->hostname, _("wrong challenge reply"));
-
-		ifdebug(SCARY_THINGS) {
-			bin2hex(myhash, hishash, SHA_DIGEST_LENGTH);
-			hishash[SHA_DIGEST_LENGTH * 2] = '\0';
-			logger(LOG_DEBUG, _("Expected challenge reply: %s"), hishash);
-		}
-
-		return false;
-	}
-
-	/* Identity has now been positively verified.
-	   Send an acknowledgement with the rest of the information needed.
-	 */
-
-	c->allow_request = ACK;
-
-	return send_ack(c);
-}
-
-bool send_ack(connection_t *c)
-{
 	/* ACK message contains rest of the information the other end needs
 	   to create node_t and edge_t structures. */
 

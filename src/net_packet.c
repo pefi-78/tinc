@@ -22,11 +22,7 @@
 
 #include "system.h"
 
-#include <openssl/rand.h>
-#include <openssl/err.h>
-#include <openssl/evp.h>
-#include <openssl/pem.h>
-#include <openssl/hmac.h>
+#include <gcrypt.h>
 
 #include <zlib.h>
 #include <lzo1x.h>
@@ -54,7 +50,6 @@
 
 int keylifetime = 0;
 int keyexpires = 0;
-EVP_CIPHER_CTX packet_ctx;
 static char lzo_wrkmem[LZO1X_999_MEM_COMPRESS > LZO1X_1_MEM_COMPRESS ? LZO1X_999_MEM_COMPRESS : LZO1X_1_MEM_COMPRESS];
 
 static void send_udppacket(node_t *, vpn_packet_t *);
@@ -88,7 +83,7 @@ void send_mtu_probe(node_t *n)
 			len = 64;
 		
 		memset(packet.data, 0, 14);
-		RAND_pseudo_bytes(packet.data + 14, len - 14);
+		gcry_randomize(packet.data + 14, len - 14, GCRY_WEAK_RANDOM);
 		packet.len = len;
 
 		ifdebug(TRAFFIC) logger(LOG_INFO, _("Sending MTU probe length %d to %s (%s)"), len, n->name, n->hostname);
@@ -173,9 +168,10 @@ static void receive_udppacket(node_t *n, vpn_packet_t *inpkt)
 	vpn_packet_t *pkt[] = { &pkt1, &pkt2, &pkt1, &pkt2 };
 	int nextpkt = 0;
 	vpn_packet_t *outpkt = pkt[0];
-	int outlen, outpad;
-	char hmac[EVP_MAX_MD_SIZE];
+	char *hmac = NULL;
+	int result;
 	int i;
+	static char iv[32] = {0};
 
 	cp();
 
@@ -191,10 +187,11 @@ static void receive_udppacket(node_t *n, vpn_packet_t *inpkt)
 
 	if(myself->digest && myself->maclength) {
 		inpkt->len -= myself->maclength;
-		HMAC(myself->digest, myself->key, myself->keylength,
-			 (char *) &inpkt->seqno, inpkt->len, hmac, NULL);
-
-		if(memcmp(hmac, (char *) &inpkt->seqno + inpkt->len, myself->maclength)) {
+		gcry_md_reset(myself->digest_ctx);
+		gcry_md_write(myself->digest_ctx, (char *)&inpkt->seqno, inpkt->len);
+		hmac = gcry_md_read(myself->digest_ctx, 0);
+	
+		if(!hmac || memcmp(hmac, (char *)&inpkt->seqno + inpkt->len, myself->maclength)) {
 			ifdebug(TRAFFIC) logger(LOG_DEBUG, _("Got unauthenticated packet from %s (%s)"),
 					   n->name, n->hostname);
 			return;
@@ -204,19 +201,28 @@ static void receive_udppacket(node_t *n, vpn_packet_t *inpkt)
 	/* Decrypt the packet */
 
 	if(myself->cipher) {
-		outpkt = pkt[nextpkt++];
+		gcry_cipher_reset(myself->cipher_ctx);
+		//memcpy(iv, &inpkt->seqno, sizeof inpkt->seqno);
+		//gcry_cipher_setiv(myself->cipher_ctx, iv, myself->cipherblklen);
+		result = gcry_cipher_decrypt(myself->cipher_ctx, (char *)&inpkt->seqno, inpkt->len, NULL, 0);
 
-		if(!EVP_DecryptInit_ex(&packet_ctx, NULL, NULL, NULL, NULL)
-				|| !EVP_DecryptUpdate(&packet_ctx, (char *) &outpkt->seqno, &outlen,
-					(char *) &inpkt->seqno, inpkt->len)
-				|| !EVP_DecryptFinal_ex(&packet_ctx, (char *) &outpkt->seqno + outlen, &outpad)) {
+		if(result) {
 			ifdebug(TRAFFIC) logger(LOG_DEBUG, _("Error decrypting packet from %s (%s): %s"),
-						n->name, n->hostname, ERR_error_string(ERR_get_error(), NULL));
+						n->name, n->hostname, gpg_strerror(result));
+			logger(LOG_DEBUG, "%p %p %d", myself->cipher_ctx, (char *)&inpkt->seqno, inpkt->len);
 			return;
 		}
+	}
+
+	/* Remove padding */
+
+	if(myself->cipherblklen > 1) {
+		int padlen;
 		
-		outpkt->len = outlen + outpad;
-		inpkt = outpkt;
+		padlen = ((uint8_t *)&inpkt->seqno)[inpkt->len - 1];
+		
+		if(padlen && padlen <= myself->cipherblklen)
+			inpkt->len -= padlen;
 	}
 
 	/* Check the sequence number */
@@ -226,13 +232,13 @@ static void receive_udppacket(node_t *n, vpn_packet_t *inpkt)
 
 	if(inpkt->seqno != n->received_seqno + 1) {
 		if(inpkt->seqno >= n->received_seqno + sizeof(n->late) * 8) {
-			logger(LOG_WARNING, _("Lost %d packets from %s (%s)"),
+			logger(LOG_WARNING, _("Lost %u packets from %s (%s)"),
 					   inpkt->seqno - n->received_seqno - 1, n->name, n->hostname);
 			
 			memset(n->late, 0, sizeof(n->late));
 		} else if (inpkt->seqno <= n->received_seqno) {
 			if(inpkt->seqno <= n->received_seqno - sizeof(n->late) * 8 || !(n->late[(inpkt->seqno / 8) % sizeof(n->late)] & (1 << inpkt->seqno % 8))) {
-				logger(LOG_WARNING, _("Got late or replayed packet from %s (%s), seqno %d, last received %d"),
+				logger(LOG_WARNING, _("Got late or replayed packet from %s (%s), seqno %u, last received %u"),
 					   n->name, n->hostname, inpkt->seqno, n->received_seqno);
 			} else
 				for(i = n->received_seqno + 1; i < inpkt->seqno; i++)
@@ -240,8 +246,10 @@ static void receive_udppacket(node_t *n, vpn_packet_t *inpkt)
 		}
 	}
 	
-	n->received_seqno = inpkt->seqno;
-	n->late[(n->received_seqno / 8) % sizeof(n->late)] &= ~(1 << n->received_seqno % 8);
+	if(inpkt->seqno > n->received_seqno) {
+		n->received_seqno = inpkt->seqno;
+		n->late[(n->received_seqno / 8) % sizeof(n->late)] &= ~(1 << n->received_seqno % 8);
+	}
 			
 	if(n->received_seqno > MAX_SEQNO)
 		keyexpires = 0;
@@ -288,11 +296,13 @@ static void send_udppacket(node_t *n, vpn_packet_t *inpkt)
 	int nextpkt = 0;
 	vpn_packet_t *outpkt;
 	int origlen;
-	int outlen, outpad;
+	int result;
 	vpn_packet_t *copy;
 	static int priority = 0;
 	int origpriority;
 	int sock;
+	char *hmac = NULL;
+	static char iv[32] = {0};
 
 	cp();
 
@@ -345,26 +355,54 @@ static void send_udppacket(node_t *n, vpn_packet_t *inpkt)
 	/* Encrypt the packet */
 
 	if(n->cipher) {
-		outpkt = pkt[nextpkt++];
+		/* Add padding */
 
-		if(!EVP_EncryptInit_ex(&n->packet_ctx, NULL, NULL, NULL, NULL)
-				|| !EVP_EncryptUpdate(&n->packet_ctx, (char *) &outpkt->seqno, &outlen,
-					(char *) &inpkt->seqno, inpkt->len)
-				|| !EVP_EncryptFinal_ex(&n->packet_ctx, (char *) &outpkt->seqno + outlen, &outpad)) {
+		if(n->cipherblklen > 1) {
+			int padlen, i;
+			uint8_t *p;
+
+			padlen = n->cipherblklen - inpkt->len % n->cipherblklen;
+			p = (char *)&inpkt->seqno + inpkt->len;
+
+			if(padlen == n->cipherblklen) {
+				if(p[-1] != 0 && p[-1] <= n->cipherblklen) {
+					inpkt->len += n->cipherblklen;
+					for(i = 0; i < n->cipherblklen; i++)
+						*p++ = i + 1;
+				}
+			} else {
+				inpkt->len += padlen;
+				for(i = 0; i < padlen; i++)
+					*p++ = i + 1;
+			}
+		}
+					
+		gcry_cipher_reset(n->cipher_ctx);
+		//memcpy(iv, &inpkt->seqno, sizeof inpkt->seqno);
+		//gcry_cipher_setiv(n->cipher_ctx, iv, n->cipherblklen);
+		result = gcry_cipher_encrypt(n->cipher_ctx, (char *)&inpkt->seqno, inpkt->len, NULL, 0);
+
+		if(result) {
 			ifdebug(TRAFFIC) logger(LOG_ERR, _("Error while encrypting packet to %s (%s): %s"),
-						n->name, n->hostname, ERR_error_string(ERR_get_error(), NULL));
+						n->name, n->hostname, gpg_strerror(result));
 			goto end;
 		}
-
-		outpkt->len = outlen + outpad;
-		inpkt = outpkt;
 	}
 
 	/* Add the message authentication code */
 
 	if(n->digest && n->maclength) {
-		HMAC(n->digest, n->key, n->keylength, (char *) &inpkt->seqno,
-			 inpkt->len, (char *) &inpkt->seqno + inpkt->len, &outlen);
+		gcry_md_reset(n->digest_ctx);
+		gcry_md_write(n->digest_ctx, (char *)&inpkt->seqno, inpkt->len);
+		hmac = gcry_md_read(n->digest_ctx, 0);
+
+		if(!hmac) {
+			ifdebug(TRAFFIC) logger(LOG_ERR, _("Error while authenticating packet to %s (%s)"),
+						n->name, n->hostname);
+			goto end;
+		}
+		
+		memcpy((char *)&inpkt->seqno + inpkt->len, hmac, n->maclength);
 		inpkt->len += n->maclength;
 	}
 

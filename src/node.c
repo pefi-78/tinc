@@ -79,7 +79,6 @@ node_t *new_node(void)
 	n->subnet_tree = new_subnet_tree();
 	n->edge_tree = new_edge_tree();
 	n->queue = list_alloc((list_action_t) free);
-	EVP_CIPHER_CTX_init(&n->packet_ctx);
 	n->mtu = MTU;
 	n->maxmtu = MTU;
 
@@ -99,8 +98,11 @@ void free_node(node_t *n)
 	if(n->hostname)
 		free(n->hostname);
 
-	if(n->key)
-		free(n->key);
+	if(n->cipherkey)
+		free(n->cipherkey);
+
+	if(n->digestkey)
+		free(n->digestkey);
 
 	if(n->subnet_tree)
 		free_subnet_tree(n->subnet_tree);
@@ -109,8 +111,6 @@ void free_node(node_t *n)
 		free_edge_tree(n->edge_tree);
 
 	sockaddrfree(&n->address);
-
-	EVP_CIPHER_CTX_cleanup(&n->packet_ctx);
 
 	if(n->mtuevent)
 		event_del(n->mtuevent);
@@ -184,9 +184,9 @@ void dump_nodes(void)
 
 	for(node = node_tree->head; node; node = node->next) {
 		n = node->data;
-		logger(LOG_DEBUG, _(" %s at %s cipher %d digest %d maclength %d compression %d options %lx status %04x nexthop %s via %s pmtu %d (min %d max %d)"),
-			   n->name, n->hostname, n->cipher ? n->cipher->nid : 0,
-			   n->digest ? n->digest->type : 0, n->maclength, n->compression,
+		logger(LOG_DEBUG, _(" %s at %s cipher %s digest %s maclength %d compression %d options %lx status %04x nexthop %s via %s pmtu %d (min %d max %d)"),
+			   n->name, n->hostname, gcry_cipher_algo_name(n->cipher),
+			   gcry_md_algo_name(n->digest), n->maclength, n->compression,
 			   n->options, *(uint32_t *)&n->status, n->nexthop ? n->nexthop->name : "-",
 			   n->via ? n->via->name : "-", n->mtu, n->minmtu, n->maxmtu);
 	}

@@ -64,7 +64,7 @@ static struct addrinfo *malloc_ai(uint16_t port, uint32_t addr)
 
 int getaddrinfo(const char *hostname, const char *servname, const struct addrinfo *hints, struct addrinfo **res)
 {
-	struct addrinfo *prev = NULL;
+	struct addrinfo *ai, *prev = NULL;
 	struct hostent *hp;
 	struct in_addr in = {0};
 	int i;
@@ -92,12 +92,14 @@ int getaddrinfo(const char *hostname, const char *servname, const struct addrinf
 		return EAI_NODATA;
 
 	for (i = 0; hp->h_addr_list[i]; i++) {
-		*res = malloc_ai(port, ((struct in_addr *)hp->h_addr_list[i])->s_addr);
+		*ai = malloc_ai(port, ((struct in_addr *)hp->h_addr_list[i])->s_addr);
 
 		if(prev)
 			prev->ai_next = *res;
+		else
+			*res = ai;
 
-		prev = *res;
+		prev = ai;
 	}
 
 	return 0;

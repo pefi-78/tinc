@@ -35,7 +35,7 @@ bool tunnelserver = false;
 /* Jumptable for the request handlers */
 
 static bool (*request_handlers[])(connection_t *) = {
-		id_h, metakey_h, challenge_h, chal_reply_h, ack_h,
+		NULL, NULL, NULL, NULL, ack_h,
 		status_h, error_h, termreq_h,
 		ping_h, pong_h,
 		add_subnet_h, del_subnet_h,

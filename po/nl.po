@@ -1,13 +1,13 @@
 # Dutch messages for tinc
-# Copyright (C) 1999-2004 Ivo Timmermans, Guus Sliepen.
+# Copyright (C) 1999-2001 Ivo Timmermans, Guus Sliepen.
 # Ivo Timmermans <ivo@o2w.nl>, 1999-2003.
 # Guus Sliepen <guus@sliepen.eu.org>, 2000-2003.
 msgid ""
 msgstr ""
-"Project-Id-Version: tinc 1.0-svn\n"
+"Project-Id-Version: tinc 1.0-cvs\n"
 "Report-Msgid-Bugs-To: tinc-devel@nl.linux.org\n"
-"POT-Creation-Date: 2004-03-15 19:28+0100\n"
-"PO-Revision-Date: 2004-03-15 19:28+0100\n"
+"POT-Creation-Date: 2004-03-15 23:20+0100\n"
+"PO-Revision-Date: 2003-10-11 16:21+0200\n"
 "Last-Translator: Guus Sliepen <guus@sliepen.eu.org>\n"
 "Language-Team: Dutch <vertaling@nl.linux.org>\n"
 "MIME-Version: 1.0\n"
@@ -55,29 +55,29 @@ msgstr ""
 msgid "Cannot open config file %s: %s"
 msgstr "Kan configuratie bestand %s niet openen: %s"
 
-#: src/conf.c:390
+#: src/conf.c:385
 #, c-format
 msgid "No value for variable `%s' on line %d while reading config file %s"
 msgstr ""
 "Geen waarde voor variabele `%s' op regel %d tijdens het lezen van "
 "configuratie bestand %s"
 
-#: src/conf.c:421
+#: src/conf.c:416
 #, c-format
 msgid "Failed to read `%s': %s"
 msgstr "Lezen van `%s' mislukte: %s"
 
-#: src/conf.c:443
+#: src/conf.c:438
 #, c-format
 msgid "Please enter a file to save %s to [%s]: "
 msgstr "Geef een bestand om de %s naar de schrijven [%s]: "
 
-#: src/conf.c:450
+#: src/conf.c:445
 #, c-format
 msgid "Error while reading stdin: %s\n"
 msgstr "Fout tijdens lezen van standaardinvoer: %s\n"
 
-#: src/conf.c:482
+#: src/conf.c:477
 #, c-format
 msgid "Error opening file `%s': %s\n"
 msgstr "Fout bij het openen van het bestand `%s': %s\n"
@@ -90,50 +90,56 @@ msgstr "iedereen"
 msgid "BROADCAST"
 msgstr "BROADCAST"
 
-#: src/connection.c:120
+#: src/connection.c:105
 msgid "Connections:"
 msgstr "Verbindingen:"
 
-#: src/connection.c:124
-#, c-format
-msgid " %s at %s options %lx socket %d status %04x"
+#: src/connection.c:109
+#, fuzzy, c-format
+msgid ""
+" %s at %s options %lx socket %d cipher %s digest %s compression %s kx method "
+"%s status %04x"
 msgstr " %s op %s opties %lx socket %d status %04x"
 
-#: src/connection.c:128
+#: src/connection.c:118
 msgid "End of connections."
 msgstr "Einde van verbindingen."
 
-#: src/meta.c:46
+#: src/meta.c:42
 #, c-format
 msgid "Sending %d bytes of metadata to %s (%s)"
 msgstr "Verzenden van %d bytes metadata naar %s (%s)"
 
-#: src/meta.c:52
-#, c-format
-msgid "Error while encrypting metadata to %s (%s): %s"
-msgstr "Fout tijdens versleutelen van metadata naar %s (%s): %s"
-
-#: src/meta.c:65 src/meta.c:118
+#: src/meta.c:50 src/meta.c:114
 #, c-format
 msgid "Connection closed by %s (%s)"
 msgstr "Verbinding beëindigd door %s (%s)"
 
-#: src/meta.c:70
+#: src/meta.c:55
 #, c-format
 msgid "Sending meta data to %s (%s) failed: %s"
 msgstr "Fout tijdens verzenden metadata naar %s (%s): %s"
 
-#: src/meta.c:123
+#: src/meta.c:97
+msgid "Continuing handshake..."
+msgstr ""
+
+#: src/meta.c:100
+#, fuzzy, c-format
+msgid "Handshake with %s (%s) completed!"
+msgstr "Verbinding met %s (%s) geactiveerd"
+
+#: src/meta.c:106
+#, fuzzy, c-format
+msgid "Handshake with %s (%s) failed: %s"
+msgstr "Fout tijdens verzenden metadata naar %s (%s): %s"
+
+#: src/meta.c:119
 #, c-format
 msgid "Metadata socket read error for %s (%s): %s"
 msgstr "Fout op metadata socket voor %s (%s) tijdens lezen: %s"
 
-#: src/meta.c:138
-#, c-format
-msgid "Error while decrypting metadata from %s (%s): %s"
-msgstr "Fout tijdens ontsleutelen van metadata van %s (%s): %s"
-
-#: src/meta.c:191
+#: src/meta.c:172
 #, c-format
 msgid "Metadata read buffer overflow for %s (%s)"
 msgstr "Metadata leesbuffer overloop voor %s (%s)"
@@ -191,329 +197,343 @@ msgstr "Legen taakrij"
 msgid "Unable to reread configuration file, exitting."
 msgstr "Kan configuratiebestand niet herlezen, beëindigen."
 
-#: src/net_packet.c:75
-#, c-format
+#: src/net_packet.c:70
+#, fuzzy, c-format
 msgid "No response to MTU probes from %s (%s)"
-msgstr "Geen antwoord van %s (%s) op MTU probes"
+msgstr "%d pakketten van %s (%s) verloren"
 
-#: src/net_packet.c:82
+#: src/net_packet.c:77
 #, c-format
 msgid "Fixing MTU of %s (%s) to %d after %d probes"
-msgstr "MTU van %s (%s) vastgezet op %d na %d probes"
+msgstr ""
 
-#: src/net_packet.c:94
-#, c-format
+#: src/net_packet.c:89
+#, fuzzy, c-format
 msgid "Sending MTU probe length %d to %s (%s)"
-msgstr "Verzending MTU probe lengte %d naar %s (%s)"
+msgstr "Verzending %s naar %s (%s)"
 
-#: src/net_packet.c:107
-#, c-format
+#: src/net_packet.c:102
+#, fuzzy, c-format
 msgid "Got MTU probe length %d from %s (%s)"
-msgstr "Kreeg MTU probe met verkeerde lengte %d van %s (%s)"
+msgstr "Kreeg verkeerde %s van %s (%s)"
 
-#: src/net_packet.c:164
+#: src/net_packet.c:159
 #, c-format
 msgid "Received packet of %d bytes from %s (%s)"
 msgstr "Ontvangst pakket van %d bytes van %s (%s)"
 
-#: src/net_packet.c:185 src/route.c:108
+#: src/net_packet.c:181 src/route.c:108
 #, c-format
 msgid "Got too short packet from %s (%s)"
 msgstr "Kreeg te kort pakket van %s (%s)"
 
-#: src/net_packet.c:198
+#: src/net_packet.c:195
 #, c-format
 msgid "Got unauthenticated packet from %s (%s)"
 msgstr "Kreeg niet-geauthenticeerd pakket van %s (%s)"
 
-#: src/net_packet.c:213
+#: src/net_packet.c:210
 #, c-format
 msgid "Error decrypting packet from %s (%s): %s"
 msgstr "Fout tijdens ontsleutelen pakket van %s (%s): %s"
 
-#: src/net_packet.c:229
-#, c-format
-msgid "Lost %d packets from %s (%s)"
+#: src/net_packet.c:235
+#, fuzzy, c-format
+msgid "Lost %u packets from %s (%s)"
 msgstr "%d pakketten van %s (%s) verloren"
 
-#: src/net_packet.c:235
-#, c-format
-msgid "Got late or replayed packet from %s (%s), seqno %d, last received %d"
+#: src/net_packet.c:241
+#, fuzzy, c-format
+msgid "Got late or replayed packet from %s (%s), seqno %u, last received %u"
 msgstr ""
 "Kreeg laat of gedupliceerd pakket van %s (%s), seqno %d, laatste ontvangen %d"
 
-#: src/net_packet.c:255
+#: src/net_packet.c:263
 #, c-format
 msgid "Error while uncompressing packet from %s (%s)"
 msgstr "Fout tijdens decomprimeren pakket van %s (%s)"
 
-#: src/net_packet.c:303
+#: src/net_packet.c:313
 #, c-format
 msgid "No valid key known yet for %s (%s), queueing packet"
 msgstr ""
 "Nog geen geldige sleutel bekend voor %s (%s), pakket wordt in wachtrij gezet"
 
-#: src/net_packet.c:332
+#: src/net_packet.c:342
 #, c-format
 msgid "Error while compressing packet to %s (%s)"
 msgstr "Fout tijdens comprimeren pakket naar %s (%s)"
 
-#: src/net_packet.c:354
+#: src/net_packet.c:386
 #, c-format
 msgid "Error while encrypting packet to %s (%s): %s"
 msgstr "Fout tijdens versleutelen pakket naar %s (%s): %s"
 
-#: src/net_packet.c:386
+#: src/net_packet.c:400
+#, fuzzy, c-format
+msgid "Error while authenticating packet to %s (%s)"
+msgstr "Fout tijdens versleutelen pakket naar %s (%s): %s"
+
+#: src/net_packet.c:424
 #, c-format
 msgid "Setting outgoing packet priority to %d"
 msgstr "Instellen prioriteit uitgaand pakket op %d"
 
-#: src/net_packet.c:388 src/net_setup.c:475 src/net_socket.c:72
-#: src/net_socket.c:123 src/net_socket.c:152 src/tincd.c:434 src/tincd.c:468
-#: src/process.c:198 src/process.c:231 src/process.c:417
-#: src/cygwin/device.c:150 src/cygwin/device.c:181 src/mingw/device.c:82
-#: src/mingw/device.c:91 src/mingw/device.c:96 src/mingw/device.c:252
-#: src/mingw/device.c:259 src/mingw/device.c:264 src/mingw/device.c:271
-#: src/mingw/device.c:280 src/mingw/device.c:287
+#: src/net_packet.c:426 src/net_setup.c:488 src/net_socket.c:84
+#: src/net_socket.c:135 src/net_socket.c:164 src/net_socket.c:437
+#: src/tincd.c:436 src/tincd.c:468 src/process.c:198 src/process.c:231
+#: src/process.c:417 src/cygwin/device.c:150 src/cygwin/device.c:181
+#: src/mingw/device.c:82 src/mingw/device.c:91 src/mingw/device.c:96
+#: src/mingw/device.c:252 src/mingw/device.c:259 src/mingw/device.c:264
+#: src/mingw/device.c:271 src/mingw/device.c:280 src/mingw/device.c:287
 #, c-format
 msgid "System call `%s' failed: %s"
 msgstr "Systeemaanroep `%s' mislukte: %s"
 
-#: src/net_packet.c:399
+#: src/net_packet.c:437
 #, c-format
 msgid "Error sending packet to %s (%s): %s"
 msgstr "Fout tijdens verzenden pakket naar %s (%s): %s"
 
-#: src/net_packet.c:422
+#: src/net_packet.c:460
 #, c-format
 msgid "Sending packet of %d bytes to %s (%s)"
 msgstr "Verzending pakket van %d bytes naar %s (%s)"
 
-#: src/net_packet.c:426
+#: src/net_packet.c:464
 #, c-format
 msgid "Node %s (%s) is not reachable"
 msgstr "Node %s (%s) is niet bereikbaar"
 
-#: src/net_packet.c:434
+#: src/net_packet.c:472
 #, c-format
 msgid "Sending packet to %s via %s (%s)"
 msgstr "Verzending pakket naar %s via %s (%s)"
 
-#: src/net_packet.c:453
+#: src/net_packet.c:491
 #, c-format
 msgid "Broadcasting packet of %d bytes from %s (%s)"
 msgstr "Verspreiding pakket van %d bytes van %s (%s)"
 
-#: src/net_packet.c:470
+#: src/net_packet.c:508
 #, c-format
 msgid "Flushing queue for %s (%s)"
 msgstr "Legen van wachtrij voor %s (%s)"
 
-#: src/net_packet.c:492
+#: src/net_packet.c:530
 #, c-format
 msgid "Receiving packet failed: %s"
 msgstr "Ontvangst pakket mislukt: %s"
 
-#: src/net_packet.c:502
+#: src/net_packet.c:540
 #, c-format
 msgid "Received UDP packet from unknown source %s"
 msgstr "Ontvangst UDP pakket van onbekende oorsprong %s"
 
-#: src/net_setup.c:77 src/net_setup.c:94
+#: src/net_setup.c:76 src/net_setup.c:93
 #, c-format
 msgid "Error reading RSA public key file `%s': %s"
 msgstr "Fout tijdens lezen RSA publieke sleutel bestand `%s': %s"
 
-#: src/net_setup.c:109
+#: src/net_setup.c:108
 #, c-format
 msgid "Reading RSA public key file `%s' failed: %s"
 msgstr "Lezen RSA publieke sleutel bestand `%s' mislukt: %s"
 
-#: src/net_setup.c:145
+#: src/net_setup.c:144
 #, c-format
 msgid "No public key for %s specified!"
 msgstr "Geen publieke sleutel bekend voor %s gespecificeerd!"
 
-#: src/net_setup.c:160
-msgid "PrivateKey used but no PublicKey found!"
-msgstr "PrivateKey gebruikt maar geen PublicKey gevonden!"
-
-#: src/net_setup.c:179
-#, c-format
-msgid "Error reading RSA private key file `%s': %s"
+#: src/net_setup.c:163
+#, fuzzy, c-format
+msgid "Error reading trust file '%s': %s"
 msgstr "Fout tijdens lezen RSA privé sleutel bestand `%s': %s"
 
-#: src/net_setup.c:187
-#, c-format
-msgid "Could not stat RSA private key file `%s': %s'"
-msgstr "Kon gegevens RSA privé sleutel bestand `%s' niet opvragen: %s"
+#: src/net_setup.c:173
+#, fuzzy, c-format
+msgid "Error reading CRL file '%s': %s"
+msgstr "Fout bij het openen van het bestand `%s': %s\n"
+
+#: src/net_setup.c:188
+msgid "JOEHOE"
+msgstr ""
 
 #: src/net_setup.c:194
-#, c-format
-msgid "Warning: insecure file permissions for RSA private key file `%s'!"
-msgstr ""
-"Waarschuwing: onveilige permissies voor RSA privé sleutel bestand `%s'!"
+#, fuzzy, c-format
+msgid "Error reading credentials from %s and %s: %s"
+msgstr "Fout tijdens lezen van %s %s: %s"
 
-#: src/net_setup.c:201
-#, c-format
-msgid "Reading RSA private key file `%s' failed: %s"
-msgstr "Fout tijdens lezen RSA privé sleutel bestand `%s': %s"
-
-#: src/net_setup.c:231 src/net_setup.c:232
+#: src/net_setup.c:226 src/net_setup.c:227
 msgid "MYSELF"
 msgstr "MIJZELF"
 
-#: src/net_setup.c:238
+#: src/net_setup.c:233
 msgid "Name for tinc daemon required!"
 msgstr "Naam voor tinc daemon verplicht!"
 
-#: src/net_setup.c:243
+#: src/net_setup.c:238
 msgid "Invalid name for myself!"
 msgstr "Ongeldige naam voor mijzelf!"
 
-#: src/net_setup.c:252
+#: src/net_setup.c:250
 msgid "Cannot open host configuration file for myself!"
 msgstr "Kan host configuratie bestand voor mijzelf niet openen!"
 
-#: src/net_setup.c:305
+#: src/net_setup.c:300
 msgid "Invalid routing mode!"
 msgstr "Ongeldige routing modus!"
 
-#: src/net_setup.c:316
+#: src/net_setup.c:311
 msgid "PriorityInheritance not supported on this platform"
 msgstr "PriorityInheritance wordt niet ondersteund op dit platform"
 
-#: src/net_setup.c:324
+#: src/net_setup.c:319
 msgid "Bogus maximum timeout!"
 msgstr "Onzinnige maximum timeout!"
 
-#: src/net_setup.c:338
+#: src/net_setup.c:333
 msgid "Invalid address family!"
 msgstr "Ongeldige adresfamilie!"
 
-#: src/net_setup.c:356
+#: src/net_setup.c:350
 msgid "Unrecognized cipher type!"
 msgstr "Onbekend cipher type!"
 
-#: src/net_setup.c:381 src/protocol_auth.c:189
+#: src/net_setup.c:361
 #, c-format
 msgid "Error during initialisation of cipher for %s (%s): %s"
 msgstr "Fout tijdens initialisatie van cipher voor %s (%s): %s"
 
-#: src/net_setup.c:398
+#: src/net_setup.c:375
+#, c-format
+msgid "Key %s len %d"
+msgstr ""
+
+#: src/net_setup.c:395
 msgid "Unrecognized digest type!"
 msgstr "Onbekend digest type!"
 
-#: src/net_setup.c:411
+#: src/net_setup.c:407
+#, fuzzy, c-format
+msgid "Error during initialisation of digest for %s (%s): %s"
+msgstr "Fout tijdens initialisatie van cipher voor %s (%s): %s"
+
+#: src/net_setup.c:428
 msgid "MAC length exceeds size of digest!"
 msgstr "MAC lengte is groter dan dat van digest!"
 
-#: src/net_setup.c:414
+#: src/net_setup.c:431
 msgid "Bogus MAC length!"
 msgstr "Onzinnige MAC lengte!"
 
-#: src/net_setup.c:428
+#: src/net_setup.c:443
 msgid "Bogus compression level!"
 msgstr "Onzinnig compressieniveau!"
 
-#: src/net_setup.c:497
+#: src/net_setup.c:510
 #, c-format
 msgid "Listening on %s"
 msgstr "Luisterend op %s"
 
-#: src/net_setup.c:508
+#: src/net_setup.c:521
 msgid "Ready"
 msgstr "Gereed"
 
-#: src/net_setup.c:510
+#: src/net_setup.c:523
 msgid "Unable to create any listening socket!"
 msgstr "Kon geen enkele luistersocket aanmaken!"
 
-#: src/net_socket.c:62
+#: src/net_socket.c:74
 #, c-format
 msgid "Creating metasocket failed: %s"
 msgstr "Aanmaak van metasocket mislukt: %s"
 
-#: src/net_socket.c:103 src/net_socket.c:195
+#: src/net_socket.c:115 src/net_socket.c:207
 #, c-format
 msgid "Can't bind to interface %s: %s"
 msgstr "Kan niet aan interface %s binden: %s"
 
-#: src/net_socket.c:108
+#: src/net_socket.c:120
 msgid "BindToInterface not supported on this platform"
 msgstr "BindToInterface wordt niet ondersteund op dit platform"
 
-#: src/net_socket.c:115
+#: src/net_socket.c:127
 #, c-format
 msgid "Can't bind to %s/tcp: %s"
 msgstr "Kan niet aan %s/tcp binden: %s"
 
-#: src/net_socket.c:142
+#: src/net_socket.c:154
 #, c-format
 msgid "Creating UDP socket failed: %s"
 msgstr "Aanmaak UDP socket mislukte: %s"
 
-#: src/net_socket.c:206
+#: src/net_socket.c:218
 #, c-format
 msgid "Can't bind to %s/udp: %s"
 msgstr "Kan niet aan %s/udp binden: %s"
 
-#: src/net_socket.c:233
+#: src/net_socket.c:245
 #, c-format
 msgid "Trying to re-establish outgoing connection in %d seconds"
 msgstr "Poging tot herstellen van uitgaande verbinding over %d seconden"
 
-#: src/net_socket.c:241
+#: src/net_socket.c:255
 #, c-format
 msgid "Connected to %s (%s)"
 msgstr "Verbonden met %s (%s)"
 
-#: src/net_socket.c:258
+#: src/net_socket.c:278
 #, c-format
 msgid "Could not set up a meta connection to %s"
 msgstr "Kon geen metaverbinding aangaan met %s"
 
-#: src/net_socket.c:292
+#: src/net_socket.c:312
 #, c-format
 msgid "Trying to connect to %s (%s)"
 msgstr "Poging tot verbinden met %s (%s)"
 
-#: src/net_socket.c:298
+#: src/net_socket.c:318
 #, c-format
 msgid "Creating socket for %s failed: %s"
 msgstr "Aanmaken socket voor %s mislukt: %s"
 
-#: src/net_socket.c:322
+#: src/net_socket.c:342
 #, c-format
 msgid "fcntl for %s: %s"
 msgstr "fcntl voor %s: %s"
 
-#: src/net_socket.c:338
+#: src/net_socket.c:358
 #, c-format
 msgid "%s: %s"
 msgstr "%s: %s"
 
-#: src/net_socket.c:359
+#: src/net_socket.c:363
+#, fuzzy
+msgid "finishing connection"
+msgstr "Einde van verbindingen."
+
+#: src/net_socket.c:380
 #, c-format
 msgid "Already connected to %s"
 msgstr "Reeds verbonden met %s"
 
-#: src/net_socket.c:378
+#: src/net_socket.c:395
 #, c-format
 msgid "No address specified for %s"
 msgstr "Geen adres gespecificeerd voor %s"
 
-#: src/net_socket.c:408
+#: src/net_socket.c:426
 #, c-format
 msgid "Accepting a new connection failed: %s"
 msgstr "Aanname van nieuwe verbinding is mislukt: %s"
 
-#: src/net_socket.c:426
+#: src/net_socket.c:453
 #, c-format
 msgid "Connection from %s"
 msgstr "Verbinding van %s"
 
-#: src/net_socket.c:450
+#: src/net_socket.c:484
 #, c-format
 msgid "Invalid name for outgoing connection in %s line %d"
 msgstr "Ongeldige naam voor uitgaande verbinding in %s regel %d"
@@ -613,111 +633,80 @@ msgstr "Verzoek reeds gezien"
 msgid "Aging past requests: deleted %d, left %d"
 msgstr "Veroudering vorige verzoeken: %d gewist, %d overgebleven"
 
-#: src/protocol_auth.c:58 src/protocol_auth.c:209 src/protocol_auth.c:338
-#: src/protocol_auth.c:405 src/protocol_auth.c:531 src/protocol_edge.c:73
-#: src/protocol_edge.c:188 src/protocol_key.c:62 src/protocol_key.c:105
-#: src/protocol_key.c:172 src/protocol_misc.c:54 src/protocol_misc.c:83
-#: src/protocol_misc.c:171 src/protocol_subnet.c:58 src/protocol_subnet.c:167
+#: src/protocol_auth.c:53
 #, c-format
-msgid "Got bad %s from %s (%s)"
-msgstr "Kreeg verkeerde %s van %s (%s)"
+msgid "No certificates from %s"
+msgstr ""
 
-#: src/protocol_auth.c:66 src/protocol_edge.c:81 src/protocol_edge.c:87
-#: src/protocol_edge.c:196 src/protocol_edge.c:202 src/protocol_subnet.c:66
-#: src/protocol_subnet.c:74 src/protocol_subnet.c:175
-#: src/protocol_subnet.c:196
-#, c-format
-msgid "Got bad %s from %s (%s): %s"
-msgstr "Kreeg verkeerde %s van %s (%s): %s"
+#: src/protocol_auth.c:63
+#, fuzzy, c-format
+msgid "Error importing certificate from %s: %s"
+msgstr "Fout tijdens ontsleutelen pakket van %s (%s): %s"
 
-#: src/protocol_auth.c:75
+#: src/protocol_auth.c:70
+#, fuzzy, c-format
+msgid "No name in certificate from %s"
+msgstr "Fout tijdens ontsleutelen pakket van %s (%s): %s"
+
+#: src/protocol_auth.c:79
+#, fuzzy, c-format
+msgid "Invalid name from %s"
+msgstr "Ongeldige naam voor mijzelf!"
+
+#: src/protocol_auth.c:85
 #, c-format
 msgid "Peer %s is %s instead of %s"
 msgstr "Ander %s is %s in plaats van %s"
 
-#: src/protocol_auth.c:85
+#: src/protocol_auth.c:96
 #, c-format
-msgid "Peer %s (%s) uses incompatible version %d"
-msgstr "Ander %s (%s) gebruikt incompatibele versie %d"
+msgid "Certificate from %s (%s) invalid"
+msgstr ""
 
-#: src/protocol_auth.c:101
+#: src/protocol_auth.c:98
+#, c-format
+msgid "Certificate from %s (%s) revoked"
+msgstr ""
+
+#: src/protocol_auth.c:100
+#, c-format
+msgid "Certificate from %s (%s) has no known signer"
+msgstr ""
+
+#: src/protocol_auth.c:102
+#, c-format
+msgid "Certificate from %s (%s) has no CA as signer"
+msgstr ""
+
+#: src/protocol_auth.c:109
 #, c-format
 msgid "Peer %s had unknown identity (%s)"
 msgstr "Ander %s heeft onbekende identiteit (%s)"
 
-#: src/protocol_auth.c:153
+#: src/protocol_auth.c:188 src/protocol_edge.c:73 src/protocol_edge.c:188
+#: src/protocol_key.c:62 src/protocol_key.c:105 src/protocol_key.c:176
+#: src/protocol_misc.c:54 src/protocol_misc.c:83 src/protocol_misc.c:171
+#: src/protocol_subnet.c:58 src/protocol_subnet.c:167
 #, c-format
-msgid "Generated random meta key (unencrypted): %s"
-msgstr "Willekeurige meta sleutel aangemaakt (niet versleuteld): %s"
+msgid "Got bad %s from %s (%s)"
+msgstr "Kreeg verkeerde %s van %s (%s)"
 
-#: src/protocol_auth.c:165 src/protocol_auth.c:238
-#, c-format
-msgid "Error during encryption of meta key for %s (%s)"
-msgstr "Fout tijdens versleutelen van meta key voor %s (%s)"
-
-#: src/protocol_auth.c:219 src/protocol_auth.c:348 src/protocol_auth.c:413
-#: src/protocol_auth.c:435
-#, c-format
-msgid "Possible intruder %s (%s): %s"
-msgstr "Mogelijke indringer %s (%s): %s"
-
-#: src/protocol_auth.c:246
-#, c-format
-msgid "Received random meta key (unencrypted): %s"
-msgstr "Ontving willekeurige meta key (niet versleuteld): %s"
-
-#: src/protocol_auth.c:257
-#, c-format
-msgid "%s (%s) uses unknown cipher!"
-msgstr "%s (%s) gebruikt onbekende cipher!"
-
-#: src/protocol_auth.c:265
-#, c-format
-msgid "Error during initialisation of cipher from %s (%s): %s"
-msgstr "Fout tijdens initalisatie van cipher van %s (%s): %s"
-
-#: src/protocol_auth.c:281 src/protocol_key.c:242
-#, c-format
-msgid "Node %s (%s) uses unknown digest!"
-msgstr "Node %s (%s) gebruikt onbekende digest!"
-
-#: src/protocol_auth.c:286
-#, c-format
-msgid "%s (%s) uses bogus MAC length!"
-msgstr "%s (%s) gebruikt onzinnige MAC lengte!"
-
-#: src/protocol_auth.c:381
-#, c-format
-msgid "Error during calculation of response for %s (%s): %s"
-msgstr "Fout tijdens berekenen van antwoord voor %s (%s): %s"
-
-#: src/protocol_auth.c:414
-msgid "wrong challenge reply length"
-msgstr "verkeerde lengte antwoord op uitdaging"
-
-#: src/protocol_auth.c:427
-#, c-format
-msgid "Error during calculation of response from %s (%s): %s"
-msgstr "Fout tijdens narekenen van antwoord van %s (%s): %s"
-
-#: src/protocol_auth.c:436
-msgid "wrong challenge reply"
-msgstr "verkeerd antwoord op uitdaging"
-
-#: src/protocol_auth.c:441
-#, c-format
-msgid "Expected challenge reply: %s"
-msgstr "Verwachtte antwoord op uitdaging: %s"
-
-#: src/protocol_auth.c:547
+#: src/protocol_auth.c:204
 #, c-format
 msgid "Established a second connection with %s (%s), closing old connection"
 msgstr "Tweede verbinding met %s (%s) gemaakt, oude verbinding wordt gesloten"
 
-#: src/protocol_auth.c:570
+#: src/protocol_auth.c:227
 #, c-format
 msgid "Connection with %s (%s) activated"
 msgstr "Verbinding met %s (%s) geactiveerd"
+
+#: src/protocol_edge.c:81 src/protocol_edge.c:87 src/protocol_edge.c:196
+#: src/protocol_edge.c:202 src/protocol_subnet.c:66 src/protocol_subnet.c:74
+#: src/protocol_subnet.c:175 src/protocol_subnet.c:196
+#, c-format
+msgid "Got bad %s from %s (%s): %s"
+msgstr "Kreeg verkeerde %s van %s (%s): %s"
 
 #: src/protocol_edge.c:82 src/protocol_edge.c:88 src/protocol_edge.c:197
 #: src/protocol_edge.c:203 src/protocol_subnet.c:67 src/protocol_subnet.c:176
@@ -755,14 +744,14 @@ msgstr "Kreeg %s van %s (%s) voor onszelf"
 msgid "Got %s from %s (%s) origin %s which does not exist"
 msgstr "Kreeg %s van %s (%s) herkomst %s welke niet bestaat"
 
-#: src/protocol_key.c:113 src/protocol_key.c:180
+#: src/protocol_key.c:113 src/protocol_key.c:184
 #, c-format
 msgid ""
 "Got %s from %s (%s) origin %s which does not exist in our connection list"
 msgstr ""
 "Kreeg %s van %s (%s) herkomst %s welke niet voorkomt in de verbindingslijst"
 
-#: src/protocol_key.c:121 src/protocol_key.c:188
+#: src/protocol_key.c:121 src/protocol_key.c:192
 #, c-format
 msgid ""
 "Got %s from %s (%s) destination %s which does not exist in our connection "
@@ -770,27 +759,32 @@ msgid ""
 msgstr ""
 "Kreeg %s van %s (%s) doel %s welke niet voorkomt in de verbindingslijst"
 
-#: src/protocol_key.c:222
+#: src/protocol_key.c:211
 #, c-format
 msgid "Node %s (%s) uses unknown cipher!"
 msgstr "Node %s (%s) gebruikt onbekende cipher!"
 
-#: src/protocol_key.c:228
+#: src/protocol_key.c:227
 #, c-format
-msgid "Node %s (%s) uses wrong keylength!"
-msgstr "Node %s (%s) gebruikt verkeerde lengte sleutel!"
+msgid "Node %s (%s) uses unknown digest!"
+msgstr "Node %s (%s) gebruikt onbekende digest!"
 
-#: src/protocol_key.c:248
+#: src/protocol_key.c:235
 #, c-format
 msgid "Node %s (%s) uses bogus MAC length!"
 msgstr "Node %s (%s) gebruikt onzinnige MAC lengte!"
 
-#: src/protocol_key.c:257
+#: src/protocol_key.c:244
 #, c-format
 msgid "Node %s (%s) uses bogus compression level!"
 msgstr "Node %s (%s) gebruikt onzinnig compressieniveau!"
 
-#: src/protocol_key.c:265
+#: src/protocol_key.c:260
+#, fuzzy, c-format
+msgid "Node %s (%s) uses wrong keylength %d instead of %d!"
+msgstr "Node %s (%s) gebruikt verkeerde lengte sleutel!"
+
+#: src/protocol_key.c:277 src/protocol_key.c:288
 #, c-format
 msgid "Error during initialisation of key from %s (%s): %s"
 msgstr "Fout tijdens initialisatie van sleutel van %s (%s): %s"
@@ -843,12 +837,12 @@ msgstr " %s eigenaar %s"
 msgid "End of subnet list."
 msgstr "Einde van subnet lijst."
 
-#: src/tincd.c:108
+#: src/tincd.c:105
 #, c-format
 msgid "Try `%s --help' for more information.\n"
 msgstr "Probeer `%s --help' voor meer informatie.\n"
 
-#: src/tincd.c:111
+#: src/tincd.c:108
 #, c-format
 msgid ""
 "Usage: %s [option]...\n"
@@ -857,7 +851,7 @@ msgstr ""
 "Gebruik: %s [optie]...\n"
 "\n"
 
-#: src/tincd.c:112
+#: src/tincd.c:109
 #, c-format
 msgid ""
 "  -c, --config=DIR           Read configuration options from DIR.\n"
@@ -887,14 +881,14 @@ msgstr ""
 "      --version              Geef versie informatie en beëindig.\n"
 "\n"
 
-#: src/tincd.c:123
+#: src/tincd.c:120
 #, c-format
 msgid "Report bugs to tinc@nl.linux.org.\n"
 msgstr ""
 "Meld fouten in het programma aan tinc@nl.linux.org;\n"
 "Meld fouten in de vertaling aan vertaling@nl.linux.org.\n"
 
-#: src/tincd.c:179
+#: src/tincd.c:176
 #, c-format
 msgid ""
 "Invalid argument `%s'; SIGNAL must be a number or one of HUP, TERM, KILL, "
@@ -903,7 +897,7 @@ msgstr ""
 "Ongeldig argument `%s'; SIGNAAL moet een getal zijn of één van HUP, TERM, "
 "KILL, USR1, USR2, WINCH, INT of ALRM.\n"
 
-#: src/tincd.c:201
+#: src/tincd.c:198
 #, c-format
 msgid ""
 "Invalid argument `%s'; BITS must be a number equal to or greater than 512.\n"
@@ -911,26 +905,31 @@ msgstr ""
 "Ongeldig argument `%s'; BITS moet een nummer zijn gelijk aan of groter dan "
 "512.\n"
 
-#: src/tincd.c:294
+#: src/tincd.c:286
+#, c-format
+msgid "Use certtool!\n"
+msgstr ""
+
+#: src/tincd.c:295
 #, c-format
 msgid "Generating %d bits keys:\n"
 msgstr "Bezig met genereren van een %d bits sleutel:\n"
 
-#: src/tincd.c:298
+#: src/tincd.c:299
 #, c-format
 msgid "Error during key generation!\n"
 msgstr "Fout tijdens genereren sleutel!\n"
 
-#: src/tincd.c:301
+#: src/tincd.c:302
 #, c-format
 msgid "Done.\n"
 msgstr "Klaar.\n"
 
-#: src/tincd.c:304
+#: src/tincd.c:305
 msgid "private RSA key"
 msgstr "geheime RSA sleutel"
 
-#: src/tincd.c:315 src/tincd.c:334
+#: src/tincd.c:316 src/tincd.c:335
 #, c-format
 msgid ""
 "Appending key to existing contents.\n"
@@ -939,21 +938,21 @@ msgstr ""
 "Sleutel wordt toegevoegd aan bestaande inhoud.\n"
 "Let er op dat er slechts één sleutel in het bestand is.\n"
 
-#: src/tincd.c:328
+#: src/tincd.c:329
 msgid "public RSA key"
 msgstr "openbare RSA sleutel"
 
-#: src/tincd.c:387
+#: src/tincd.c:389
 msgid "Both netname and configuration directory given, using the latter..."
 msgstr ""
 "Zowel netnaam als configuratiemap zijn gegeven, laatste wordt gebruikt..."
 
-#: src/tincd.c:408
+#: src/tincd.c:410
 #, c-format
 msgid "%s version %s (built %s %s, protocol %d)\n"
 msgstr "%s versie %s (gemaakt %s %s, protocol %d)\n"
 
-#: src/tincd.c:410
+#: src/tincd.c:412
 #, c-format
 msgid ""
 "Copyright (C) 1998-2003 Ivo Timmermans, Guus Sliepen and others.\n"
@@ -971,7 +970,7 @@ msgstr ""
 "en je bent welkom om het te distribueren onder bepaalde voorwaarden;\n"
 "zie het bestand COPYING voor details.\n"
 
-#: src/tincd.c:438
+#: src/tincd.c:440
 msgid "mlockall() not supported on this platform!"
 msgstr "mlockall() wordt niet ondersteund op dit platform!"
 
@@ -1059,9 +1058,9 @@ msgid "A tincd is already running with pid %ld.\n"
 msgstr "Een tincd draait al met pid %ld.\n"
 
 #: src/process.c:261
-#, c-format
+#, fuzzy, c-format
 msgid "Could write pid file %s: %s\n"
-msgstr "Kon pid bestand %s niet openen: %s\n"
+msgstr "Kon `%s' niet openen: %s"
 
 #: src/process.c:283
 #, c-format
@@ -1094,9 +1093,9 @@ msgid "Couldn't detach from terminal: %s"
 msgstr "Kon niet ontkoppelen van terminal: %s"
 
 #: src/process.c:341
-#, c-format
+#, fuzzy, c-format
 msgid "Could not write pid file %s: %s\n"
-msgstr "Kon pid bestand %s niet schrijven: %s\n"
+msgstr "Kon `%s' niet openen: %s"
 
 #: src/process.c:352
 #, c-format
@@ -1184,52 +1183,48 @@ msgstr "Nieuw MAC adres %hx:%hx:%hx:%hx:%hx:%hx geleerd"
 #: src/route.c:165
 #, c-format
 msgid "Subnet %s expired"
-msgstr "Subnet %s is verlopen"
+msgstr ""
 
 #: src/route.c:200 src/route.c:353 src/route.c:495
-#, c-format
+#, fuzzy, c-format
 msgid "Packet looping back to %s (%s)!"
-msgstr "Pakket komt terug naar %s (%s)!"
+msgstr "Pakket komt terug naar ons!"
 
 #: src/route.c:299
 #, c-format
 msgid "Length of packet (%d) doesn't match length in IPv4 header (%d)"
 msgstr ""
-"Lengte van pakket (%d) komt niet overeen met lengte in IPv4 header (%d)"
 
 #: src/route.c:303
-#, c-format
+#, fuzzy, c-format
 msgid "Fragmenting packet of %d bytes to %s (%s)"
-msgstr "Fragmentatie pakket van %d bytes naar %s (%s)"
+msgstr "Verzending pakket van %d bytes naar %s (%s)"
 
 #: src/route.c:341
-#, c-format
+#, fuzzy, c-format
 msgid ""
 "Cannot route packet from %s (%s): unknown IPv4 destination address %d.%d.%d.%"
 "d"
-msgstr ""
-"Kan pakket van %s (%s) niet routeren: onbekend IPv4 doeladres %d.%d.%d.%d"
+msgstr "Kan pakket niet routeren: onbekend IPv4 doeladres %d.%d.%d.%d"
 
 #: src/route.c:366 src/route.c:505
 #, c-format
 msgid "Packet for %s (%s) length %d larger than MTU %d"
-msgstr "Packet voor %s (%s) lengte %d groter dan MTU %d"
+msgstr ""
 
 #: src/route.c:479
-#, c-format
+#, fuzzy, c-format
 msgid ""
 "Cannot route packet from %s (%s): unknown IPv6 destination address %hx:%hx:%"
 "hx:%hx:%hx:%hx:%hx:%hx"
 msgstr ""
-"Kan pakket van %s (%s) niet routeren: onbekend IPv6 doeladres %hx:%hx:%hx:%"
-"hx:%hx:%hx:%hx:%hx"
+"Kan pakket niet routeren: onbekend IPv6 doeladres %hx:%hx:%hx:%hx:%hx:%hx:%"
+"hx:%hx"
 
 #: src/route.c:537
 #, c-format
 msgid "Got neighbor solicitation request from %s (%s) while in router mode!"
 msgstr ""
-"Kreeg neighbor solicitation request van %s (%s) terwijl we in router mode "
-"werken!"
 
 #: src/route.c:556
 msgid ""
@@ -1253,9 +1248,9 @@ msgstr ""
 "hx:%hx:%hx:%hx:%hx:%hx:%hx:%hx"
 
 #: src/route.c:671
-#, c-format
+#, fuzzy, c-format
 msgid "Got ARP request from %s (%s) while in router mode!"
-msgstr "Kreeg ARP request van %s (%s) terwijl we in router mode werken!"
+msgstr "Kreeg %s van %s (%s) voor %s welke niet voorkomt in de node boom"
 
 #: src/route.c:688
 msgid "Cannot route packet: received unknown type ARP request"
@@ -1267,22 +1262,22 @@ msgid "Cannot route packet: ARP request for unknown address %d.%d.%d.%d"
 msgstr "Kan pakket niet routeren: ARP verzoek voor onbekend adres %d.%d.%d.%d"
 
 #: src/route.c:753
-#, c-format
+#, fuzzy, c-format
 msgid "Cannot route packet from %s (%s): unknown type %hx"
-msgstr "Kan pakket van %s (%s) niet routeren: onbekend type %hx"
+msgstr "Kan pakket niet routeren: onbekend type %hx"
 
 #: src/node.c:183
 msgid "Nodes:"
 msgstr "Nodes:"
 
 #: src/node.c:187
-#, c-format
+#, fuzzy, c-format
 msgid ""
-" %s at %s cipher %d digest %d maclength %d compression %d options %lx status "
+" %s at %s cipher %s digest %s maclength %d compression %d options %lx status "
 "%04x nexthop %s via %s pmtu %d (min %d max %d)"
 msgstr ""
 " %s op %s cipher %d digest %d maclengte %d compressie %d opties %lx status %"
-"04x nexthop %s via %s pmtu %d (min %d max %d)"
+"04x nexthop %s via %s"
 
 #: src/node.c:194
 msgid "End of nodes."
@@ -1505,6 +1500,65 @@ msgstr "Kan interface %s niet vinden: %s"
 #, c-format
 msgid "Could not bind to %s: %s"
 msgstr "Kon niet aan interface `%s' binden: %s"
+
+#, fuzzy
+#~ msgid "%s is %s"
+#~ msgstr "%s is een %s"
+
+#~ msgid "Error while encrypting metadata to %s (%s): %s"
+#~ msgstr "Fout tijdens versleutelen van metadata naar %s (%s): %s"
+
+#~ msgid "Error while decrypting metadata from %s (%s): %s"
+#~ msgstr "Fout tijdens ontsleutelen van metadata van %s (%s): %s"
+
+#~ msgid "Could not stat RSA private key file `%s': %s'"
+#~ msgstr "Kon gegevens RSA privé sleutel bestand `%s' niet opvragen: %s"
+
+#~ msgid "Warning: insecure file permissions for RSA private key file `%s'!"
+#~ msgstr ""
+#~ "Waarschuwing: onveilige permissies voor RSA privé sleutel bestand `%s'!"
+
+#~ msgid "Reading RSA private key file `%s' failed: %s"
+#~ msgstr "Fout tijdens lezen RSA privé sleutel bestand `%s': %s"
+
+#~ msgid "Peer %s (%s) uses incompatible version %d"
+#~ msgstr "Ander %s (%s) gebruikt incompatibele versie %d"
+
+#~ msgid "Generated random meta key (unencrypted): %s"
+#~ msgstr "Willekeurige meta sleutel aangemaakt (niet versleuteld): %s"
+
+#~ msgid "Error during encryption of meta key for %s (%s)"
+#~ msgstr "Fout tijdens versleutelen van meta key voor %s (%s)"
+
+#~ msgid "Possible intruder %s (%s): %s"
+#~ msgstr "Mogelijke indringer %s (%s): %s"
+
+#~ msgid "Received random meta key (unencrypted): %s"
+#~ msgstr "Ontving willekeurige meta key (niet versleuteld): %s"
+
+#~ msgid "%s (%s) uses unknown cipher!"
+#~ msgstr "%s (%s) gebruikt onbekende cipher!"
+
+#~ msgid "Error during initialisation of cipher from %s (%s): %s"
+#~ msgstr "Fout tijdens initalisatie van cipher van %s (%s): %s"
+
+#~ msgid "%s (%s) uses bogus MAC length!"
+#~ msgstr "%s (%s) gebruikt onzinnige MAC lengte!"
+
+#~ msgid "Error during calculation of response for %s (%s): %s"
+#~ msgstr "Fout tijdens berekenen van antwoord voor %s (%s): %s"
+
+#~ msgid "wrong challenge reply length"
+#~ msgstr "verkeerde lengte antwoord op uitdaging"
+
+#~ msgid "Error during calculation of response from %s (%s): %s"
+#~ msgstr "Fout tijdens narekenen van antwoord van %s (%s): %s"
+
+#~ msgid "wrong challenge reply"
+#~ msgstr "verkeerd antwoord op uitdaging"
+
+#~ msgid "Expected challenge reply: %s"
+#~ msgstr "Verwachtte antwoord op uitdaging: %s"
 
 #~ msgid "Restarting in %d seconds!"
 #~ msgstr "Herstart in %d seconden!"

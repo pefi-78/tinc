@@ -23,8 +23,7 @@
 #ifndef __TINC_CONNECTION_H__
 #define __TINC_CONNECTION_H__
 
-#include <openssl/rsa.h>
-#include <openssl/evp.h>
+#include <gnutls/gnutls.h>
 
 #include "avl_tree.h"
 
@@ -51,14 +50,14 @@ typedef struct connection_status_t {
 #include "node.h"
 
 typedef struct connection_t {
-	char *name;					/* name he claims to have */
+	char *name;			/* name he claims to have */
 
-	union sockaddr_t address;			/* his real (internet) ip */
-	char *hostname;				/* the hostname of its real ip */
+	union sockaddr_t address;	/* his real (internet) ip */
+	char *hostname;			/* the hostname of its real ip */
 	int protocol_version;		/* used protocol */
 
-	int socket;					/* socket used for this connection */
-	long int options;			/* options for this connection */
+	int socket;			/* socket used for this connection */
+	long int options;		/* options for this connection */
 	struct connection_status_t status;	/* status info */
 	int estimated_weight;		/* estimation for the weight of the edge for this connection */
 	struct timeval start;		/* time this connection was started, used for above estimation */
@@ -67,29 +66,14 @@ typedef struct connection_t {
 	struct node_t *node;		/* node associated with the other end */
 	struct edge_t *edge;		/* edge associated with this connection */
 
-	RSA *rsa_key;				/* his public/private key */
-	const EVP_CIPHER *incipher;	/* Cipher he will use to send data to us */
-	const EVP_CIPHER *outcipher;	/* Cipher we will use to send data to him */
-	EVP_CIPHER_CTX *inctx;		/* Context of encrypted meta data that will come from him to us */
-	EVP_CIPHER_CTX *outctx;		/* Context of encrypted meta data that will be sent from us to him */
-	char *inkey;				/* His symmetric meta key + iv */
-	char *outkey;				/* Our symmetric meta key + iv */
-	int inkeylength;			/* Length of his key + iv */
-	int outkeylength;			/* Length of our key + iv */
-	const EVP_MD *indigest;
-	const EVP_MD *outdigest;
-	int inmaclength;
-	int outmaclength;
-	int incompression;
-	int outcompression;
-	char *mychallenge;			/* challenge we received from him */
-	char *hischallenge;			/* challenge we sent to him */
+	gnutls_session session;
+	gnutls_certificate_credentials credentials;
 
 	char buffer[MAXBUFSIZE];	/* metadata input buffer */
-	int buflen;					/* bytes read into buffer */
-	int reqlen;					/* length of incoming request */
-	int tcplen;					/* length of incoming TCPpacket */
-	int allow_request;			/* defined if there's only one request possible */
+	int buflen;			/* bytes read into buffer */
+	int reqlen;			/* length of incoming request */
+	int tcplen;			/* length of incoming TCPpacket */
+	int allow_request;		/* defined if there's only one request possible */
 
 	time_t last_ping_time;		/* last time we saw some activity from the other end */
 

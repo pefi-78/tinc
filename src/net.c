@@ -22,7 +22,7 @@
 
 #include "system.h"
 
-#include <openssl/rand.h>
+#include <gcrypt.h>
 
 #include "utils.h"
 #include "avl_tree.h"
@@ -377,9 +377,9 @@ int main_loop(void)
 			if(keyexpires < now) {
 				ifdebug(STATUS) logger(LOG_INFO, _("Regenerating symmetric key"));
 
-				RAND_pseudo_bytes(myself->key, myself->keylength);
+				gcry_randomize(myself->cipherkey, myself->cipherkeylen, GCRY_STRONG_RANDOM);
 				if(myself->cipher)
-					EVP_DecryptInit_ex(&packet_ctx, myself->cipher, NULL, myself->key, myself->key + myself->cipher->key_len);
+					gcry_cipher_setkey(myself->cipher_ctx, myself->cipherkey, myself->cipherkeylen);
 				send_key_changed(broadcast, myself);
 				keyexpires = now + keylifetime;
 			}

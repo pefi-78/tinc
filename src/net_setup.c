@@ -22,11 +22,9 @@
 
 #include "system.h"
 
-#include <openssl/pem.h>
-#include <openssl/rsa.h>
-#include <openssl/rand.h>
-#include <openssl/err.h>
-#include <openssl/evp.h>
+#include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
+#include <gcrypt.h>
 
 #include "avl_tree.h"
 #include "conf.h"
@@ -46,6 +44,7 @@
 
 char *myport;
 
+#if 0
 bool read_rsa_public_key(connection_t *c)
 {
 	FILE *fp;
@@ -146,65 +145,61 @@ bool read_rsa_public_key(connection_t *c)
 
 	return false;
 }
+#endif
 
-bool read_rsa_private_key(void)
+bool setup_credentials(void)
 {
-	FILE *fp;
-	char *fname, *key, *pubkey;
-	struct stat s;
+	char *trust = NULL, *crl = NULL;
+	char *key = NULL, *cert = NULL;
+	int result;
 
 	cp();
 
-	if(get_config_string(lookup_config(config_tree, "PrivateKey"), &key)) {
-		if(!get_config_string(lookup_config(myself->connection->config_tree, "PublicKey"), &pubkey)) {
-			logger(LOG_ERR, _("PrivateKey used but no PublicKey found!"));
+	gnutls_certificate_allocate_credentials(&myself->connection->credentials);
+
+	if(get_config_string(lookup_config(config_tree, "TrustFile"), &trust)) {
+		result = gnutls_certificate_set_x509_trust_file(myself->connection->credentials, trust, GNUTLS_X509_FMT_PEM);
+		if(result < 0) {
+			logger(LOG_ERR, _("Error reading trust file '%s': %s"), trust, gnutls_strerror(result));
+			free(trust);
 			return false;
 		}
-		myself->connection->rsa_key = RSA_new();
-//		RSA_blinding_on(myself->connection->rsa_key, NULL);
-		BN_hex2bn(&myself->connection->rsa_key->d, key);
-		BN_hex2bn(&myself->connection->rsa_key->n, pubkey);
-		BN_hex2bn(&myself->connection->rsa_key->e, "FFFF");
+		free(trust);
+	}
+
+	if(get_config_string(lookup_config(config_tree, "CRLFile"), &crl)) {
+		result = gnutls_certificate_set_x509_crl_file(myself->connection->credentials, crl, GNUTLS_X509_FMT_PEM);
+		if(result) {
+			logger(LOG_ERR, _("Error reading CRL file '%s': %s"), crl, gnutls_strerror(result));
+			free(crl);
+			return false;
+		}
+		free(crl);
+	}
+
+	if(!get_config_string(lookup_config(config_tree, "PrivateKeyFile"), &key))
+		asprintf(&key, "%s/rsa_key.priv", confbase);
+
+	if(!get_config_string(lookup_config(config_tree, "CertificateFile"), &cert))
+		asprintf(&cert, "%s/hosts/%s", confbase, myself->name);
+
+	
+	gnutls_certificate_set_x509_trust_file(myself->connection->credentials, cert, GNUTLS_X509_FMT_PEM);
+	logger(LOG_DEBUG, _("JOEHOE"));
+	gnutls_certificate_set_verify_flags(myself->connection->credentials, GNUTLS_VERIFY_DISABLE_CA_SIGN);
+	
+	result = gnutls_certificate_set_x509_key_file(myself->connection->credentials, cert, key, GNUTLS_X509_FMT_PEM);
+
+	if(result) {
+		logger(LOG_ERR, _("Error reading credentials from %s and %s: %s"), cert, key, gnutls_strerror(result));
 		free(key);
-		free(pubkey);
-		return true;
-	}
-
-	if(!get_config_string(lookup_config(config_tree, "PrivateKeyFile"), &fname))
-		asprintf(&fname, "%s/rsa_key.priv", confbase);
-
-	fp = fopen(fname, "r");
-
-	if(!fp) {
-		logger(LOG_ERR, _("Error reading RSA private key file `%s': %s"),
-			   fname, strerror(errno));
-		free(fname);
+		free(cert);
 		return false;
 	}
 
-#if !defined(HAVE_MINGW) && !defined(HAVE_CYGWIN)
-	if(fstat(fileno(fp), &s)) {
-		logger(LOG_ERR, _("Could not stat RSA private key file `%s': %s'"),
-				fname, strerror(errno));
-		free(fname);
-		return false;
-	}
-
-	if(s.st_mode & ~0100700)
-		logger(LOG_WARNING, _("Warning: insecure file permissions for RSA private key file `%s'!"), fname);
-#endif
-
-	myself->connection->rsa_key = PEM_read_RSAPrivateKey(fp, NULL, NULL, NULL);
-	fclose(fp);
-
-	if(!myself->connection->rsa_key) {
-		logger(LOG_ERR, _("Reading RSA private key file `%s' failed: %s"),
-			   fname, strerror(errno));
-		free(fname);
-		return false;
-	}
-
-	free(fname);
+	free(key);
+	free(cert);
+	
 	return true;
 }
 
@@ -220,7 +215,7 @@ bool setup_myself(void)
 	char *envp[5];
 	struct addrinfo *ai, *aip, hint = {0};
 	bool choice;
-	int i, err;
+	int i, err, result;
 
 	cp();
 
@@ -248,15 +243,15 @@ bool setup_myself(void)
 	myself->name = name;
 	myself->connection->name = xstrdup(name);
 
+	if(!setup_credentials())
+		return false;
+
 	if(!read_connection_config(myself->connection)) {
 		logger(LOG_ERR, _("Cannot open host configuration file for myself!"));
 		return false;
 	}
 
-	if(!read_rsa_private_key())
-		return false;
-
-	if(!get_config_string(lookup_config(myself->connection->config_tree, "Port"), &myport))
+	if(!get_config_string (lookup_config(myself->connection->config_tree, "Port"), &myport))
 		asprintf(&myport, "655");
 
 	/* Read in all the subnets specified in the host configuration file */
@@ -345,12 +340,11 @@ bool setup_myself(void)
 
 	/* Generate packet encryption key */
 
-	if(get_config_string
-	   (lookup_config(myself->connection->config_tree, "Cipher"), &cipher)) {
+	if(get_config_string (lookup_config(myself->connection->config_tree, "Cipher"), &cipher)) {
 		if(!strcasecmp(cipher, "none")) {
-			myself->cipher = NULL;
+			myself->cipher = GCRY_CIPHER_NONE;
 		} else {
-			myself->cipher = EVP_get_cipherbyname(cipher);
+			myself->cipher = gcry_cipher_map_name(cipher);
 
 			if(!myself->cipher) {
 				logger(LOG_ERR, _("Unrecognized cipher type!"));
@@ -358,41 +352,44 @@ bool setup_myself(void)
 			}
 		}
 	} else
-		myself->cipher = EVP_bf_cbc();
+		myself->cipher = GCRY_CIPHER_AES;
 
+	if(myself->cipher) {
+		result = gcry_cipher_open(&myself->cipher_ctx, myself->cipher, GCRY_CIPHER_MODE_CBC, GCRY_CIPHER_SECURE);
+
+		if(result) {
+			logger(LOG_ERR, _("Error during initialisation of cipher for %s (%s): %s"),
+					myself->name, myself->hostname, gcry_strerror(result));
+			return false;
+		}
+
+	}
+
+	if(myself->cipher) {
+		myself->cipherkeylen = gcry_cipher_get_algo_keylen(myself->cipher);
+		myself->cipherblklen = gcry_cipher_get_algo_blklen(myself->cipher);
+	} else {
+		myself->cipherkeylen = 1;
+	}
+
+	logger(LOG_DEBUG, _("Key %s len %d"), gcry_cipher_algo_name(myself->cipher), myself->cipherkeylen);
+	myself->cipherkey = xmalloc(myself->cipherkeylen);
+	gcry_randomize(myself->cipherkey, myself->cipherkeylen, GCRY_STRONG_RANDOM);
 	if(myself->cipher)
-		myself->keylength = myself->cipher->key_len + myself->cipher->iv_len;
-	else
-		myself->keylength = 1;
-
-	myself->connection->outcipher = EVP_bf_ofb();
-
-	myself->key = xmalloc(myself->keylength);
-	RAND_pseudo_bytes(myself->key, myself->keylength);
+		gcry_cipher_setkey(myself->cipher_ctx, myself->cipherkey, myself->cipherkeylen);
 
 	if(!get_config_int(lookup_config(config_tree, "KeyExpire"), &keylifetime))
 		keylifetime = 3600;
 
 	keyexpires = now + keylifetime;
 	
-	if(myself->cipher) {
-		EVP_CIPHER_CTX_init(&packet_ctx);
-		if(!EVP_DecryptInit_ex(&packet_ctx, myself->cipher, NULL, myself->key, myself->key + myself->cipher->key_len)) {
-			logger(LOG_ERR, _("Error during initialisation of cipher for %s (%s): %s"),
-					myself->name, myself->hostname, ERR_error_string(ERR_get_error(), NULL));
-			return false;
-		}
-
-	}
-
 	/* Check if we want to use message authentication codes... */
 
-	if(get_config_string
-	   (lookup_config(myself->connection->config_tree, "Digest"), &digest)) {
+	if(get_config_string (lookup_config(myself->connection->config_tree, "Digest"), &digest)) {
 		if(!strcasecmp(digest, "none")) {
-			myself->digest = NULL;
+			myself->digest = GCRY_MD_NONE;
 		} else {
-			myself->digest = EVP_get_digestbyname(digest);
+			myself->digest = gcry_md_map_name(digest);
 
 			if(!myself->digest) {
 				logger(LOG_ERR, _("Unrecognized digest type!"));
@@ -400,14 +397,34 @@ bool setup_myself(void)
 			}
 		}
 	} else
-		myself->digest = EVP_sha1();
+		myself->digest = GCRY_MD_SHA1;
 
-	myself->connection->outdigest = EVP_sha1();
 
-	if(get_config_int(lookup_config(myself->connection->config_tree, "MACLength"),
-		&myself->maclength)) {
+	if(myself->digest) {
+		result = gcry_md_open(&myself->digest_ctx, myself->digest, GCRY_MD_FLAG_SECURE | GCRY_MD_FLAG_HMAC);
+
+		if(result) {
+			logger(LOG_ERR, _("Error during initialisation of digest for %s (%s): %s"),
+					myself->name, myself->hostname, gcry_strerror(result));
+			return false;
+		}
+
+	}
+
+	if(myself->digest) {
+		myself->digestlen = gcry_md_get_algo_dlen(myself->digest);
+	} else {
+		myself->digestlen = 1;
+	}
+
+	myself->digestkey = xmalloc(myself->digestlen);
+	gcry_randomize(myself->digestkey, myself->digestlen, GCRY_STRONG_RANDOM);
+	if(myself->digest)
+		gcry_md_setkey(myself->digest_ctx, myself->digestkey, myself->digestlen);
+
+	if(get_config_int(lookup_config(myself->connection->config_tree, "MACLength"), &myself->maclength)) {
 		if(myself->digest) {
-			if(myself->maclength > myself->digest->md_size) {
+			if(myself->maclength > myself->digestlen) {
 				logger(LOG_ERR, _("MAC length exceeds size of digest!"));
 				return false;
 			} else if(myself->maclength < 0) {
@@ -417,8 +434,6 @@ bool setup_myself(void)
 		}
 	} else
 		myself->maclength = 4;
-
-	myself->connection->outmaclength = 0;
 
 	/* Compression */
 
@@ -430,8 +445,6 @@ bool setup_myself(void)
 		}
 	} else
 		myself->compression = 0;
-
-	myself->connection->outcompression = 0;
 
 	/* Done */
 

@@ -321,7 +321,7 @@ int read_config_file(avl_tree_t *config_tree, const char *fname)
 	int err = -2;				/* Parse error */
 	FILE *fp;
 	char *buffer, *line;
-	char *variable, *value, *eol;
+	char *variable, *value;
 	int lineno = 0;
 	int len;
 	bool ignore = false;
@@ -372,10 +372,6 @@ int read_config_file(avl_tree_t *config_tree, const char *fname)
 
 		variable = value = line;
 
-		eol = line + strlen(line);
-		while(strchr("\t ", *--eol))
-			*eol = '\0';
-
 		len = strcspn(value, "\t =");
 		value += len;
 		value += strspn(value, "\t ");
@@ -385,7 +381,6 @@ int read_config_file(avl_tree_t *config_tree, const char *fname)
 		}
 		variable[len] = '\0';
 
-	
 		if(!*value) {
 			logger(LOG_ERR, _("No value for variable `%s' on line %d while reading config file %s"),
 				   variable, lineno, fname);

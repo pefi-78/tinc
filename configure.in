@@ -5,7 +5,7 @@ dnl $Id: configure.in,v 1.13.2.86 2004/01/10 23:21:36 guus Exp $
 AC_PREREQ(2.59)
 AC_INIT
 AC_CONFIG_SRCDIR([src/tincd.c])
-AM_INIT_AUTOMAKE(tinc, 1.0-cvs)
+AM_INIT_AUTOMAKE(tinc, 1.0-gnutls)
 AC_CONFIG_HEADERS([config.h])
 AM_MAINTAINER_MODE
 
@@ -279,7 +279,8 @@ case $host_os in
   ;;
 esac
 
-tinc_OPENSSL
+dnl tinc_OPENSSL
+AM_PATH_LIBGNUTLS([1.0.4], [], [AC_MSG_ERROR([GNUTLS library not found.]); break;])
 tinc_ZLIB
 tinc_LZO
 

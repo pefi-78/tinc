@@ -129,7 +129,7 @@ bool req_key_h(connection_t *c)
 		mykeyused = true;
 		from->received_seqno = 0;
 		memset(from->late, 0, sizeof(from->late));
-		send_ans_key(c, myself, from);
+		send_ans_key(c, from);
 	} else {
 		if(tunnelserver)
 			return false;
@@ -140,35 +140,39 @@ bool req_key_h(connection_t *c)
 	return true;
 }
 
-bool send_ans_key(connection_t *c, const node_t *from, const node_t *to)
+bool send_ans_key(connection_t *c, const node_t *to)
 {
-	char key[MAX_STRING_SIZE];
+	char cipherkey[myself->cipherkeylen * 2 + 1];
+	char digestkey[myself->digestlen * 2 + 1];
 
 	cp();
 
-	bin2hex(from->key, key, from->keylength);
-	key[from->keylength * 2] = '\0';
+	bin2hex(myself->cipherkey, cipherkey, myself->cipherkeylen);
+	cipherkey[myself->cipherkeylen * 2] = '\0';
 
-	return send_request(c, "%d %s %s %s %d %d %d %d", ANS_KEY,
-						from->name, to->name, key,
-						from->cipher ? from->cipher->nid : 0,
-						from->digest ? from->digest->type : 0, from->maclength,
-						from->compression);
+	bin2hex(myself->digestkey, digestkey, myself->digestlen);
+	digestkey[myself->digestlen * 2] = '\0';
+
+	return send_request(c, "%d %s %s %s %s %d %d %d %d", ANS_KEY,
+						myself->name, to->name, cipherkey, digestkey,
+						myself->cipher,
+						myself->digest, myself->maclength,
+						myself->compression);
 }
 
 bool ans_key_h(connection_t *c)
 {
 	char from_name[MAX_STRING_SIZE];
 	char to_name[MAX_STRING_SIZE];
-	char key[MAX_STRING_SIZE];
+	char cipherkey[MAX_STRING_SIZE];
+	char digestkey[MAX_STRING_SIZE];
 	int cipher, digest, maclength, compression;
 	node_t *from, *to;
 
 	cp();
 
-	if(sscanf(c->buffer, "%*d "MAX_STRING" "MAX_STRING" "MAX_STRING" %d %d %d %d",
-		from_name, to_name, key, &cipher, &digest, &maclength,
-		&compression) != 7) {
+	if(sscanf(c->buffer, "%*d "MAX_STRING" "MAX_STRING" "MAX_STRING" "MAX_STRING" %d %d %d %d",
+			from_name, to_name, cipherkey, digestkey, &cipher, &digest, &maclength, &compression) != 8) {
 		logger(LOG_ERR, _("Got bad %s from %s (%s)"), "ANS_KEY", c->name,
 			   c->hostname);
 		return false;
@@ -199,58 +203,41 @@ bool ans_key_h(connection_t *c)
 		return send_request(to->nexthop->connection, "%s", c->buffer);
 	}
 
-	/* Update our copy of the origin's packet key */
-
-	if(from->key)
-		free(from->key);
-
-	from->key = xstrdup(key);
-	from->keylength = strlen(key) / 2;
-	hex2bin(from->key, from->key, from->keylength);
-	from->key[from->keylength] = '\0';
-
-	from->status.validkey = true;
-	from->status.waitingforkey = false;
-	from->sent_seqno = 0;
-
 	/* Check and lookup cipher and digest algorithms */
 
 	if(cipher) {
-		from->cipher = EVP_get_cipherbynid(cipher);
-
-		if(!from->cipher) {
+		from->cipher = cipher;
+		if(!*gcry_cipher_algo_name(from->cipher)) {
 			logger(LOG_ERR, _("Node %s (%s) uses unknown cipher!"), from->name,
 				   from->hostname);
 			return false;
 		}
 
-		if(from->keylength != from->cipher->key_len + from->cipher->iv_len) {
-			logger(LOG_ERR, _("Node %s (%s) uses wrong keylength!"), from->name,
-				   from->hostname);
-			return false;
-		}
+		from->cipherblklen = gcry_cipher_get_algo_blklen(from->cipher);
 	} else {
-		from->cipher = NULL;
+		from->cipher = GCRY_CIPHER_NONE;
 	}
 
 	from->maclength = maclength;
 
 	if(digest) {
-		from->digest = EVP_get_digestbynid(digest);
+		from->digest = digest;
 
-		if(!from->digest) {
+		if(!*gcry_md_algo_name(from->digest)) {
 			logger(LOG_ERR, _("Node %s (%s) uses unknown digest!"), from->name,
 				   from->hostname);
 			return false;
 		}
 
-		if(from->maclength > from->digest->md_size || from->maclength < 0) {
+		from->digestlen = gcry_md_get_algo_dlen(from->digest);
+		
+		if(from->maclength > from->digestlen || from->maclength < 0) {
 			logger(LOG_ERR, _("Node %s (%s) uses bogus MAC length!"),
 				   from->name, from->hostname);
 			return false;
 		}
 	} else {
-		from->digest = NULL;
+		from->digest = GCRY_MD_NONE;
 	}
 
 	if(compression < 0 || compression > 11) {
@@ -260,12 +247,53 @@ bool ans_key_h(connection_t *c)
 	
 	from->compression = compression;
 
-	if(from->cipher)
-		if(!EVP_EncryptInit_ex(&from->packet_ctx, from->cipher, NULL, from->key, from->key + from->cipher->key_len)) {
+	/* Update our copy of the origin's packet key */
+
+	if(from->cipherkey)
+		free(from->cipherkey);
+
+	from->cipherkeylen = strlen(cipherkey) / 2;
+	from->cipherkey = xmalloc(from->cipherkeylen);
+	hex2bin(cipherkey, from->cipherkey, from->cipherkeylen);
+
+	if(from->cipherkeylen != gcry_cipher_get_algo_keylen(from->cipher)) {
+		logger(LOG_ERR, _("Node %s (%s) uses wrong keylength %d instead of %d!"), from->name,
+			   from->hostname, from->cipherkeylen, gcry_cipher_get_algo_keylen(from->cipher) );
+		return false;
+	}
+
+	if(from->digestkey)
+		free(from->digestkey);
+
+	from->digestlen = strlen(digestkey) / 2;
+	from->digestkey = xmalloc(from->digestlen);
+	hex2bin(digestkey, from->digestkey, from->digestlen);
+	
+	if(from->cipher) {
+		int result;
+		result = gcry_cipher_open(&from->cipher_ctx, from->cipher, GCRY_CIPHER_MODE_CBC, GCRY_CIPHER_SECURE);
+		gcry_cipher_setkey(from->cipher_ctx, from->cipherkey, from->cipherkeylen);
+		if(result) {
 			logger(LOG_ERR, _("Error during initialisation of key from %s (%s): %s"),
-					from->name, from->hostname, ERR_error_string(ERR_get_error(), NULL));
+					from->name, from->hostname, gcry_strerror(result));
 			return false;
 		}
+	}
+
+	if(from->digest) {
+		int result;
+		result = gcry_md_open(&from->digest_ctx, from->digest, GCRY_MD_FLAG_SECURE | GCRY_MD_FLAG_HMAC);
+		gcry_md_setkey(from->digest_ctx, from->digestkey, from->digestlen);
+		if(result) {
+			logger(LOG_ERR, _("Error during initialisation of key from %s (%s): %s"),
+					from->name, from->hostname, gcry_strerror(result));
+			return false;
+		}
+	}
+
+	from->status.validkey = true;
+	from->status.waitingforkey = false;
+	from->sent_seqno = 0;
 
 	if(from->options & OPTION_PMTU_DISCOVERY && !from->mtuprobes)
 		send_mtu_probe(from);

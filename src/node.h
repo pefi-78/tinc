@@ -23,6 +23,8 @@
 #ifndef __TINC_NODE_H__
 #define __TINC_NODE_H__
 
+#include <gcrypt.h>
+
 #include "avl_tree.h"
 #include "connection.h"
 #include "event.h"
@@ -48,13 +50,17 @@ typedef struct node_t {
 
 	node_status_t status;
 
-	const EVP_CIPHER *cipher;		/* Cipher type for UDP packets */
-	char *key;				/* Cipher key and iv */
-	int keylength;				/* Cipher key and iv length */
-	EVP_CIPHER_CTX packet_ctx;		/* Cipher context */
+	int cipher;				/* Cipher type for UDP packets */
+	char *cipherkey;			/* Cipher key */
+	int cipherkeylen;			/* Cipher key length */
+	int cipherblklen;
+	gcry_cipher_hd_t cipher_ctx;		/* Cipher context */
 	
-	const EVP_MD *digest;			/* Digest type for MAC */
+	int digest;				/* Digest type for MAC */
+	char *digestkey;
+	int digestlen;
 	int maclength;				/* Length of MAC */
+	gcry_md_hd_t digest_ctx;
 
 	int compression;			/* Compressionlevel, 0 = no compression */
 

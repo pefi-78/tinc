@@ -22,6 +22,8 @@
 
 #include "system.h"
 
+#include <gnutls/gnutls.h>
+
 #include "avl_tree.h"
 #include "conf.h"
 #include "connection.h"
@@ -44,6 +46,16 @@ int seconds_till_retry = 5;
 
 listen_socket_t listen_socket[MAXSOCKETS];
 int listen_sockets;
+
+int certselfunc(gnutls_session session,  const gnutls_datum *client_cert, int ncerts, const gnutls_datum* req_ca_cert, int nreqs) {
+	logger(LOG_DEBUG, "Client certificate select function called with %d certs, %d requests\n", ncerts, nreqs);
+	return 0;
+}
+
+int scertselfunc(gnutls_session session,  const gnutls_datum *server_cert, int ncerts) {
+	logger(LOG_DEBUG, "Server certificate select function called with %d certs\n", ncerts);
+	return 0;
+}
 
 /* Setup sockets */
 
@@ -236,13 +248,21 @@ void retry_outgoing(outgoing_t *outgoing)
 
 void finish_connecting(connection_t *c)
 {
+	int result;
+
 	cp();
 
 	ifdebug(CONNECTIONS) logger(LOG_INFO, _("Connected to %s (%s)"), c->name, c->hostname);
 
 	c->last_ping_time = now;
 
-	send_id(c);
+	gnutls_init(&c->session, GNUTLS_SERVER);
+	gnutls_set_default_priority(c->session);
+	gnutls_credentials_set(c->session, GNUTLS_CRD_CERTIFICATE, myself->connection->credentials);
+	gnutls_certificate_server_set_request(c->session, GNUTLS_CERT_REQUEST);
+//	gnutls_certificate_client_set_select_function(c->session, certselfunc);
+//	gnutls_certificate_server_set_select_function(c->session, scertselfunc);
+	gnutls_transport_set_ptr(c->session, c->socket);
 }
 
 void do_outgoing_connection(connection_t *c)
@@ -340,6 +360,7 @@ begin:
 		goto begin;
 	}
 
+	logger(LOG_DEBUG, _("finishing connection"));
 	finish_connecting(c);
 
 	return;
@@ -364,10 +385,6 @@ void setup_outgoing_connection(outgoing_t *outgoing)
 
 	c = new_connection();
 	c->name = xstrdup(outgoing->name);
-	c->outcipher = myself->connection->outcipher;
-	c->outdigest = myself->connection->outdigest;
-	c->outmaclength = myself->connection->outmaclength;
-	c->outcompression = myself->connection->outcompression;
 
 	init_configuration(&c->config_tree);
 	read_connection_config(c);
@@ -399,6 +416,7 @@ bool handle_new_meta_connection(int sock)
 	connection_t *c;
 	sockaddr_t sa;
 	int fd, len = sizeof(sa);
+	int result;
 
 	cp();
 
@@ -410,13 +428,22 @@ bool handle_new_meta_connection(int sock)
 		return false;
 	}
 
+#ifdef O_NONBLOCK
+	{
+		int flags = fcntl(fd, F_GETFL);
+
+		if(fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+			closesocket(fd);
+			logger(LOG_ERR, _("System call `%s' failed: %s"), "fcntl",
+				   strerror(errno));
+			return -1;
+		}
+	}
+#endif
+
 	sockaddrunmap(&sa);
 
 	c = new_connection();
-	c->outcipher = myself->connection->outcipher;
-	c->outdigest = myself->connection->outdigest;
-	c->outmaclength = myself->connection->outmaclength;
-	c->outcompression = myself->connection->outcompression;
 
 	c->address = sa;
 	c->hostname = sockaddr2hostname(&sa);
@@ -428,7 +455,14 @@ bool handle_new_meta_connection(int sock)
 	connection_add(c);
 
 	c->allow_request = ID;
-	send_id(c);
+	gnutls_init(&c->session, GNUTLS_CLIENT);
+	gnutls_set_default_priority(c->session);
+	gnutls_credentials_set(c->session, GNUTLS_CRD_CERTIFICATE, myself->connection->credentials);
+	gnutls_certificate_server_set_request(c->session, GNUTLS_CERT_REQUEST);
+//	gnutls_certificate_client_set_select_function(c->session, certselfunc);
+//	gnutls_certificate_server_set_select_function(c->session, scertselfunc);
+	gnutls_transport_set_ptr(c->session, c->socket);
+	gnutls_handshake(c->session);
 
 	return true;
 }

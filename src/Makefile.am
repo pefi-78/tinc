@@ -21,7 +21,7 @@ noinst_HEADERS = conf.h connection.h device.h edge.h event.h graph.h logger.h me
 LIBS = @LIBS@ @LIBINTL@
 
 tincd_LDADD = \
-	$(top_builddir)/lib/libvpn.a
+	$(top_builddir)/lib/libvpn.a -lgnutls
 
 localedir = $(datadir)/locale
 

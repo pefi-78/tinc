@@ -78,21 +78,6 @@ void free_connection(connection_t *c)
 {
 	cp();
 
-	if(c->hostname)
-		free(c->hostname);
-
-	if(c->inkey)
-		free(c->inkey);
-
-	if(c->outkey)
-		free(c->outkey);
-
-	if(c->mychallenge)
-		free(c->mychallenge);
-
-	if(c->hischallenge)
-		free(c->hischallenge);
-
 	free(c);
 }
 
@@ -121,8 +106,13 @@ void dump_connections(void)
 
 	for(node = connection_tree->head; node; node = node->next) {
 		c = node->data;
-		logger(LOG_DEBUG, _(" %s at %s options %lx socket %d status %04x"),
-			   c->name, c->hostname, c->options, c->socket, *(uint32_t *)&c->status);
+		logger(LOG_DEBUG, _(" %s at %s options %lx socket %d cipher %s digest %s compression %s kx method %s status %04x"),
+				c->name, c->hostname, c->options, c->socket,
+				c->session ? gnutls_cipher_get_name(gnutls_cipher_get(c->session)) : "-",
+				c->session ? gnutls_mac_get_name(gnutls_mac_get(c->session)) : "-",
+				c->session ? gnutls_compression_get_name(gnutls_compression_get(c->session)) : "-",
+				c->session ? gnutls_kx_get_name(gnutls_kx_get(c->session)) : "-",
+			   *(uint32_t *)&c->status);
 	}
 
 	logger(LOG_DEBUG, _("End of connections."));

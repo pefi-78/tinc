@@ -17,7 +17,7 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-    $Id: hooks.c,v 1.1.2.1 2002/04/16 17:00:02 zarq Exp $
+    $Id: hooks.c,v 1.1.2.2 2002/04/16 17:20:46 zarq Exp $
 */
 
 #include "config.h"
@@ -56,7 +56,7 @@ void run_hooks(const char *type, ...)
   if(!t)
     return;
 
-  va_start(args, fmt);
+  va_start(args, type);
   for(avlnode = t->head; avlnode; avlnode = avlnode->next)
     {
       assert(avlnode->data);

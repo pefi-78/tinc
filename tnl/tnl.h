@@ -47,7 +47,8 @@ typedef enum tnl_status {
 
 typedef struct tnl_ep {
 	struct sockaddr_storage address;
-	struct tnl_ep_identity *id;
+	char *id;
+	char *hostname;
 	struct tnl_ep_credentials *cred;
 	struct tnl_ep_cryptoparm *parm;
 } tnl_ep_t;

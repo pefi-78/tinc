@@ -139,7 +139,65 @@ static bool tnl_recv_handler(fd_t *fd) {
 	return tnl_recv(tnl);
 }
 
+static bool tnl_authenticate(tnl_t *tnl) {
+	gnutls_x509_crt cert;
+        const gnutls_datum *certs;
+        int ncerts = 0, result;
+	char buf[1024], *name, *p;
+	int len;
+
+	certs = gnutls_certificate_get_peers(tnl->session, &ncerts);
+
+	if (!certs || !ncerts) {
+		logger(LOG_ERR, _("tnl: no certificates from %s"), tnl->remote.hostname);
+		return false;
+	}
+
+	len = sizeof buf;
+	gnutls_x509_crt_init(&cert);
+	result = gnutls_x509_crt_import(cert, certs, GNUTLS_X509_FMT_DER) ?: gnutls_x509_crt_get_dn(cert, buf, &len);
+
+	if(result) {
+		logger(LOG_ERR, _("tnl: error importing certificate from %s: %s"), tnl->remote.hostname, gnutls_strerror(errno));
+		gnutls_x509_crt_deinit(cert);
+		return false;
+	}
+
+	name = strstr(buf, "CN=");
+	if(!name) {
+		logger(LOG_ERR, _("tnl: no name in certificate from %s"), tnl->remote.hostname);
+		gnutls_x509_crt_deinit(cert);
+		return false;
+	}
+
+	name += 3;
+	for(p = name; *p && *p != ','; p++);
+	*p = '\0';
+
+	if(tnl->remote.id && strcmp(tnl->remote.id, name)) {
+		logger(LOG_ERR, _("tnl: peer %s is %s instead of %s"), tnl->remote.hostname, name, tnl->remote.id);
+		return false;
+	}
+
+	replace(tnl->remote.id, name);
+
+	result = gnutls_certificate_verify_peers(tnl->session);
+
+	if(result < 0) {
+		logger(LOG_ERR, "tnl: error verifying certificate from %s (%s): %s\n", tnl->remote.id, tnl->remote.hostname, gnutls_strerror(result));
+		return false;
+	}
+
+	if(result) {
+		logger(LOG_ERR, "tnl: certificate from %s (%s) not good, verification result %x", tnl->remote.id, tnl->remote.hostname, result);
+		return false;
+	}
+}
+
+	
+
 static bool tnl_handshake_handler(fd_t *fd) {
+	char id[1024];
 	tnl_t *tnl = fd->data;
 	int result;
 
@@ -157,21 +215,11 @@ static bool tnl_handshake_handler(fd_t *fd) {
 	
 	logger(LOG_DEBUG, _("tnl: handshake finished"));
 
-	result = gnutls_certificate_verify_peers(tnl->session);
-	if(result < 0) {
-		logger(LOG_ERR, "tnl: certificate error: %s\n", gnutls_strerror(result));
-		tnl->close(tnl);
+	if(!tnl_authenticate(tnl))
 		return false;
-	}
-
-	if(result) {
-		logger(LOG_ERR, "tnl: certificate not good, verification result %x", result);
-		tnl->close(tnl);
-		return false;
-	}
 
 	tnl->status == TNL_STATUS_UP;
-	tnl->fd.handler = tnl_recv_handler;
+	tnl->fd.read = tnl_recv_handler;
 	tnl->accept(tnl);
 	return true;
 }
@@ -231,7 +279,7 @@ static bool tnl_accept_handler(fd_t *fd) {
 
 	sa_unmap(&ss);
 
-	new(tnl);
+	clear(new(tnl));
 	tnl->local = listener->local;
 	tnl->remote.address = ss;
 	len = sizeof tnl->local.address;
@@ -244,8 +292,7 @@ static bool tnl_accept_handler(fd_t *fd) {
 	tnl->close = tnl_close;
 
 	tnl->fd.fd = sock;
-	tnl->fd.mode = FD_MODE_READ;
-	tnl->fd.handler = tnl_handshake_handler;
+	tnl->fd.read = tnl_handshake_handler;
 	tnl->fd.data = tnl;
 
 	fcntl(sock, F_SETFL, fcntl(sock, F_GETFL) | O_NONBLOCK);
@@ -281,8 +328,6 @@ static bool tnl_connect_handler(fd_t *fd) {
 		return false;
 	}
 	
-	fd_del(&tnl->fd);
-
 	fcntl(tnl->fd.fd, F_SETFL, fcntl(tnl->fd.fd, F_GETFL) | O_NONBLOCK);
 
 	tnl->status = TNL_STATUS_HANDSHAKE;
@@ -294,9 +339,9 @@ static bool tnl_connect_handler(fd_t *fd) {
 	gnutls_transport_set_ptr(tnl->session, (gnutls_transport_ptr)fd->fd);
 	gnutls_handshake(tnl->session);
 
-	tnl->fd.mode = FD_MODE_READ;
-	tnl->fd.handler = tnl_handshake_handler;
-	fd_add(&tnl->fd);
+	tnl->fd.write = NULL;
+	tnl->fd.read = tnl_handshake_handler;
+	fd_mod(&tnl->fd);
 
 	logger(LOG_DEBUG, _("tnl: connected"));
 	
@@ -330,8 +375,7 @@ bool tnl_connect(tnl_t *tnl) {
 	tnl->status = TNL_STATUS_CONNECTING;
 
 	tnl->fd.fd = sock;
-	tnl->fd.mode = FD_MODE_WRITE;
-	tnl->fd.handler = tnl_connect_handler;
+	tnl->fd.write = tnl_connect_handler;
 	tnl->fd.data = tnl;
 
 	tnl->send_packet = tnl_send_packet;
@@ -339,7 +383,6 @@ bool tnl_connect(tnl_t *tnl) {
 	tnl->close = tnl_close;
 	
 	tnl_add(tnl);
-
 
 	fd_add(&tnl->fd);
 
@@ -374,8 +417,7 @@ bool tnl_listen(tnl_listen_t *listener) {
 	}
 
 	listener->fd.fd = sock;
-	listener->fd.mode = FD_MODE_READ;
-	listener->fd.handler = tnl_accept_handler;
+	listener->fd.read = tnl_accept_handler;
 	listener->fd.data = listener;
 	listener->close = tnl_listen_close;
 

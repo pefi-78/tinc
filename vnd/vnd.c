@@ -122,8 +122,7 @@ bool vnd_open(vnd_t *vnd) {
 		vnd->mtu = 1514;
 
 	vnd->send = vnd_send;
-	vnd->fd.mode = FD_MODE_READ;
-	vnd->fd.handler = vnd_recv_handler;
+	vnd->fd.read = vnd_recv_handler;
 	vnd->fd.data = vnd;
 
 	if(vnd->description)

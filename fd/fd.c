@@ -34,7 +34,7 @@ static avl_tree_t *fds;
 volatile bool fd_running = false;
 
 int fd_compare(struct fd *a, struct fd *b) {
-	return (a->fd - b->fd) ?: (a->mode - b->mode);
+	return a->fd - b->fd;
 };
 
 bool fd_init(void) {
@@ -42,7 +42,7 @@ bool fd_init(void) {
 
 	FD_ZERO(&readset);
 	FD_ZERO(&writeset);
-	FD_ZERO(&exceptset);
+	FD_ZERO(&errorset);
 
 	fds = avl_tree_new((avl_compare_t)fd_compare, NULL);
 

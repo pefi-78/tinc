@@ -1,5 +1,5 @@
 /*
-    fd.c -- I/O and event multiplexing
+    fd_epoll.c -- I/O and event multiplexing using epoll
 
     Copyright (C) 2003-2004 Guus Sliepen <guus@tinc-vpn.org>,
 
@@ -17,7 +17,7 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-    $Id$
+    $Id: fd.c 1375 2004-03-22 12:30:39Z guus $
 */
 
 #include "system.h"
@@ -27,8 +27,7 @@
 #include "fd/event.h"
 #include "fd/fd.h"
 
-static fd_set readset, writeset, errorset;
-static int max_fd;
+static int epollfd;
 static avl_tree_t *fds;
 
 volatile bool fd_running = false;
@@ -40,9 +39,12 @@ int fd_compare(struct fd *a, struct fd *b) {
 bool fd_init(void) {
 	int i;
 
-	FD_ZERO(&readset);
-	FD_ZERO(&writeset);
-	FD_ZERO(&exceptset);
+	epollfd = epoll_create(32);
+
+	if(epollfd == -1) {
+		logger(LOG_ERR, "fd: could not open an epoll file descriptor: %s", strerror(errno));
+		return false;
+	}
 
 	fds = avl_tree_new((avl_compare_t)fd_compare, NULL);
 
@@ -53,72 +55,77 @@ bool fd_exit(void) {
 	event_exit();
 
 	avl_tree_del(fds);
+
+	close(epollfd);
 }
 
 bool fd_add(struct fd *fd) {
 	if(!avl_add(fds, fd))
 		return false;
+	
+	fd->event.events = 0;
 
 	if(fd->read)
-		FD_SET(fd->fd, &readset);
+		fd->event.events |= EPOLLIN;
 
 	if(fd->write)
-		FD_SET(fd->fd, &writeset);
+		fd->event.events |= EPOLLOUT;
 
 	if(fd->error)
-		FD_SET(fd->fd, &errorset);
-	
-	if(fd->fd > max_fd)
-		max_fd = fd->fd;
+		fd->event.events |= EPOLLPRI | EPOLLERR | EPOLLHUP;
+
+	fd->event.data.ptr = fd;
+
+	if(epoll_ctl(epollfd, EPOLL_CTL_ADD, fd->fd, &fd->event) == -1) {
+		logger(LOG_ERR, "fd: failed to add file descriptor: %s", strerror(errno));
+		return false;
+	}
 
 	return true;
 };
 
 bool fd_del(struct fd *fd) {
-	FD_CLR(fd->fd, &readset);
-	FD_CLR(fd->fd, &writeset);
-	FD_CLR(fd->fd, &errorset);
-	
-	if(fd->fd >= max_fd)
-		max_fd = ((struct fd *)fds->tail)->fd;
+	if(epoll_ctl(epollfd, EPOLL_CTL_DEL, fd->fd, &fd->event) == -1) {
+		logger(LOG_ERR, "fd: failed to delete file descriptor: %s", strerror(errno));
+		return false;
+	}
 
 	return avl_del(fds, fd);
 };
 
 bool fd_mod(struct fd *fd) {
+	fd->event.events = 0;
+
 	if(fd->read)
-		FD_SET(fd->fd, &readset);
-	else
-		FD_CLR(fd->fd, &readset);
+		fd->event.events |= EPOLLIN;
 
 	if(fd->write)
-		FD_SET(fd->fd, &writeset);
-	else
-		FD_CLR(fd->fd, &writeset);
+		fd->event.events |= EPOLLOUT;
 
 	if(fd->error)
-		FD_SET(fd->fd, &errorset);
-	else
-		FD_CLR(fd->fd, &errorset);
+		fd->event.events |= EPOLLPRI | EPOLLERR | EPOLLHUP;
+
+	if(epoll_ctl(epollfd, EPOLL_CTL_MOD, fd->fd, &fd->event) == -1) {
+		logger(LOG_ERR, "fd: failed to modify file descriptor: %s", strerror(errno));
+		return false;
+	}
+
+	return true;
 }	
 
 bool fd_run(void) {
 	struct timeval tv;
 	int result;
-	fd_set readtmp, writetmp, errortmp;
+	struct epoll_event *events[10];
 
 	fd_running = true;
 
 	logger(LOG_INFO, "fd: running");
 		
 	while(fd_running) {
-		readtmp = readset;
-		writetmp = writeset;
-		errortmp = errorset;
-
 		tv = event_timeout();
 
-		result = select(max_fd + 1, &readtmp, &writetmp, &errortmp, tv.tv_sec >= 0 ? &tv : NULL);
+		result = epoll_wait(epollfd, events, sizeof events / sizeof *events, tv.tv_sec >= 0 ? tv.tv_sec * 1000 + tv.tv_usec / 1000: -1);
 
 		if(result < 0) {
 			if(errno != EINTR && errno != EAGAIN) {
@@ -131,15 +138,19 @@ bool fd_run(void) {
 
 		if(result) {
 			struct fd *fd;
-			
-			avl_foreach(fds, fd, {
-				if(fd->read && FD_ISSET(fd->fd, &readtmp))
+
+			while(result--) {
+				fd = events[result].data.ptr;
+
+				if(events[result].events & EPOLLIN)
 					fd->read(fd);
-				if(fd->write && FD_ISSET(fd->fd, &writetmp))
+
+				if(events[result].events & EPOLLOUT)
 					fd->write(fd);
-				if(fd->error && FD_ISSET(fd->fd, &errortmp))
+
+				if(events[result].events & (EPOLLPRI | EPOLLERR | EPOLLHUP))
 					fd->error(fd);
-			});
+			}
 		} else {
 			event_handle();
 		}

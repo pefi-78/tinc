@@ -1,5 +1,5 @@
 /*
-    fd.h -- I/O and event multiplexing
+    fd_epoll.h -- I/O and event multiplexing using epoll
 
     Copyright (C) 2003-2004 Guus Sliepen <guus@tinc-vpn.org>,
 
@@ -17,7 +17,7 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-    $Id$
+    $Id: fd.h 1375 2004-03-22 12:30:39Z guus $
 */
 
 #ifndef __FD_H__
@@ -33,6 +33,10 @@ typedef struct fd {
 	fd_handler_t write;
 	fd_handler_t error;
 	void *data;
+
+	/* Private */
+	
+	struct epoll_event event;
 } fd_t;
 
 extern bool fd_init(void);

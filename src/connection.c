@@ -17,13 +17,12 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-    $Id: connection.c,v 1.2 2002/04/09 15:26:00 zarq Exp $
+    $Id: connection.c,v 1.2.2.1 2002/04/14 09:31:20 zarq Exp $
 */
 
 #include "config.h"
 
 #include <stdio.h>
-#include <syslog.h>
 #include <string.h>
 #include <sys/time.h>
 
@@ -36,6 +35,7 @@
 #include "conf.h"
 #include <utils.h>
 #include "subnet.h"
+#include "logging.h"
 
 #include "xalloc.h"
 #include "system.h"

@@ -19,7 +19,7 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-    $Id: conf.c,v 1.12 2002/04/13 10:04:14 zarq Exp $
+    $Id: conf.c,v 1.12.2.1 2002/04/14 09:30:16 zarq Exp $
 */
 
 #include "config.h"
@@ -30,11 +30,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syslog.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <syslog.h>
 #include <string.h>
 
 #include <xalloc.h>
@@ -43,6 +41,7 @@
 
 #include "conf.h"
 #include "netutl.h" /* for str2address */
+#include "logging.h"
 
 #include "system.h"
 

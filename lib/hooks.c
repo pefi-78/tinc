@@ -17,7 +17,7 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-    $Id: hooks.c,v 1.1.2.3 2002/04/16 21:24:55 zarq Exp $
+    $Id: hooks.c,v 1.1.2.4 2002/04/16 21:47:18 zarq Exp $
 */
 
 #include "config.h"
@@ -68,7 +68,7 @@ void run_hooks(const char *type, ...)
   if(!hooks_tree)
     return;
   hn = (struct hooks_node*)avl_search(hooks_tree, type);
-  if(!hn)
+  if(!hn || !(hn->hooks->head))
     {
       fprintf(stderr, "Warning, no hooks found for `%s'\n", type);
       return;

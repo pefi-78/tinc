@@ -1,17 +1,13 @@
-AC_PREREQ(2.59)
+AC_PREREQ(2.61)
 AC_INIT
-AC_CONFIG_SRCDIR([tincd.c])
+AC_CONFIG_SRCDIR([src/tincd.c])
 AM_INIT_AUTOMAKE(tinc, 2.0-svn)
 AC_CONFIG_HEADERS([config.h])
 AM_MAINTAINER_MODE
 
-dnl Include the macros from the m4/ directory
-dnl AM_ACLOCAL_INCLUDE(m4)
+AM_GNU_GETTEXT([external])
+AM_GNU_GETTEXT_VERSION(0.16.1)
 
-dnl AM_GNU_GETTEXT([external])
-dnl AM_GNU_GETTEXT_VERSION(0.14.1)
-
-AC_DEFINE([_GNU_SOURCE], 1, [Enable GNU extenstions])
 AC_DEFINE([__USE_BSD], 1, [Enable BSD extensions])
 
 dnl ALL_LINGUAS="nl"
@@ -19,14 +15,10 @@ dnl ALL_LINGUAS="nl"
 dnl Checks for programs.
 AC_PROG_CC
 AC_PROG_CPP
-AC_PROG_GCC_TRADITIONAL
-AC_PROG_AWK
 AC_PROG_INSTALL
 AC_PROG_LN_S
-AC_PROG_MAKE_SET
-AC_PROG_RANLIB
 
-AC_ISC_POSIX
+AC_GNU_SOURCE
 
 dnl Check and set OS
 
@@ -64,13 +56,6 @@ case $host_os in
 esac
 
 AC_CACHE_SAVE
-
-if test -d /sw/include ; then
-  CPPFLAGS="$CPPFLAGS -I/sw/include"
-fi
-if test -d /sw/lib ; then
-  LIBS="$LIBS -L/sw/lib"
-fi
 
 dnl Checks for libraries.
 
@@ -240,8 +225,8 @@ AC_FUNC_MEMCMP
 AC_FUNC_ALLOCA
 AC_TYPE_SIGNAL
 AC_CHECK_FUNCS([asprintf daemon fchmod flock ftime fork get_current_dir_name gettimeofday mlockall putenv random select strdup strerror strsignal strtol system unsetenv vsyslog])
-dnl jm_FUNC_MALLOC
-dnl jm_FUNC_REALLOC
+AC_FUNC_MALLOC
+AC_FUNC_REALLOC
 
 dnl Support for SunOS
 
@@ -256,33 +241,12 @@ AC_CHECK_FUNCS([freeaddrinfo gai_strerror getaddrinfo getnameinfo inet_aton])
 
 AC_CACHE_SAVE
 
-dnl These are defined in files in m4/
+tinc_LIBEVENT
+tinc_LZO
+AM_PATH_LIBGNUTLS([1.4.0], [], [AC_MSG_ERROR([GNUTLS library not found.]); break])
+AM_PATH_LIBGNUTLS_EXTRA([1.4.0], [], [AC_MSG_ERROR([GNUTLS extra library not found.]); break])
+AM_PATH_LIBGCRYPT([1.2.0], [], [AC_MSG_ERROR([Gcrypt library not found.]); break])
 
-dnl case $host_os in
-dnl  *linux*)
-dnl    tinc_TUNTAP
-dnl  ;;
-dnl esac
-
-dnl tinc_OPENSSL
-dnl tinc_ZLIB
-dnl tinc_LZO
-
-AM_PATH_LIBGNUTLS([1.0.4], [], [AC_MSG_ERROR([GNUTLS library not found.]); break])
-
-dnl Check if support for jumbograms is requested 
-dnl AC_ARG_ENABLE(jumbograms,
-dnl  AS_HELP_STRING(--enable-jumbograms,enable support for jumbograms (packets up to 9000 bytes)),
-dnl  [ AC_DEFINE(ENABLE_JUMBOGRAMS, 1, [Support for jumbograms (packets up to 9000 bytes)]) ]
-dnl )
-
-dnl Check if checkpoint tracing has to be enabled
-dnl AC_ARG_ENABLE(tracing,
-dnl  AS_HELP_STRING(--enable-tracing,enable checkpoint tracing (debugging only)),
-dnl  [ AC_DEFINE(ENABLE_TRACING, 1, [Checkpoint tracing]) ]
-dnl )
-
-dnl AC_CONFIG_FILES([Makefile src/Makefile doc/Makefile doc/tincd.8 doc/tinc.conf.5 doc/tincinclude.texi lib/Makefile po/Makefile.in m4/Makefile])
-AC_CONFIG_FILES([Makefile cfg/Makefile fd/Makefile logger/Makefile rt/Makefile support/Makefile tnl/Makefile vnd/Makefile])
+AC_CONFIG_FILES([Makefile m4/Makefile])
 
 AC_OUTPUT

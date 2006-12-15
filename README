@@ -1,9 +1,9 @@
-This is the README file for tinc version 2.0. Installation
-instructions may be found in the INSTALL file.
+This is the README file for tinc version 2.0. Installation instructions may be
+found in the INSTALL file.
 
-tinc is Copyright (C) 1998-2004 by:
+tinc is Copyright (C) 1998-2006 by:
 
-Ivo Timmermans <ivo@tinc-vpn.org>,
+Ivo Timmermans,
 Guus Sliepen <guus@tinc-vpn.org>,
 and others.
 
@@ -14,28 +14,41 @@ it under the terms of the GNU General Public License as published by
 the Free Software Foundation; either version 2 of the License, or (at
 your option) any later version. See the file COPYING for more details.
 
-Security statement
-------------------
 
-Revamped.
+About tinc 2.0
+--------------
 
+Compared to older versions of tinc, the security will be improved. This version
+will use the TLS protocol to set up connections between tinc daemons. Not only
+is this more secure than our own protocol we used in former versions of tinc,
+it also allows, thanks to the GNUTLS library, different ways to authenticate:
 
-Compatibility
--------------
+- X.509 certificates allow trust to be governed by a certificate authority,
+  ideal when trust is to be managed centrally.
 
-Version 2.0 is not compatible with older version.
+- OpenPGP certificates allow trust to be done in a peer-to-peer way, ideal when
+  there is no central authority.
 
+- SRP allows a tinc daemon to authenticate itself with a username and password.
+  Ideal for a client/server setup.
+
+Furthermore, tinc will be split into a few components. The "tincd" from 1.0
+will remain, but will purely be a daemon that runs in the backgrounds and that
+manages a peer-to-peer VPN. A "tinc" binary will be used to set up, configure,
+start/stop and monitor a running tincd. A tinc client daemon will be created
+that will only be able to connect to one other tincd, thereby greatly
+simplifying it, but will have features added that are interesting for clients,
+for example pulling configuration from a tincd. There will also be one or more
+GUI versions of the tinc binary.
+
+Tinc 2.0 will not be compatible with older versions.
 
 Requirements
 ------------
 
-Gnutls, gcrypt, zlib, lzo.
+- GNUTLS 1.6.0 or later.
+- Gcrypt 1.4.0 or later.
+- LZO 2.0 or later.
+- Libevent 1.1 or later.
 
 In order to compile tinc, you will need a GNU C compiler environment.
-
-
-Features
---------
-
-Kitchen sink and LRF support.
-
